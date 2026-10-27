@@ -23,7 +23,19 @@ MACHINE_ID_VAL="${CROWDNINJA_MACHINE_ID:-crowdninja}"
 
 if [ -n "$DB_HOST_VAL" ] && [ -n "$DB_PASS_VAL" ]; then
   echo "[CrowdNinja] Configuring Cloud-Native PostgreSQL connection ($DB_HOST_VAL:$DB_PORT_VAL/$DB_NAME_VAL)..."
+  SHARED_SIM_LINE=""
+  SHARED_PROF_LINE=""
+  if [ -d /etc/crowdsec/shared ]; then
+    [ -f /etc/crowdsec/shared/simulation.yaml ] || printf "simulation: false\n" > /etc/crowdsec/shared/simulation.yaml
+    if [ ! -f /etc/crowdsec/shared/profiles.yaml ] && [ -f /etc/crowdsec/profiles.yaml ]; then
+      cp /etc/crowdsec/profiles.yaml /etc/crowdsec/shared/profiles.yaml
+    fi
+    SHARED_SIM_LINE="config_paths:
+  simulation_path: /etc/crowdsec/shared/simulation.yaml"
+    SHARED_PROF_LINE="    profiles_path: /etc/crowdsec/shared/profiles.yaml"
+  fi
   cat > /etc/crowdsec/config.yaml.local <<EOF
+${SHARED_SIM_LINE}
 db_config:
   log_level: info
   type: postgresql
@@ -37,6 +49,7 @@ api:
   client:
     credentials_path: /etc/crowdsec/local_api_credentials.yaml
   server:
+${SHARED_PROF_LINE}
     online_client:
       credentials_path: /var/lib/crowdsec/data/online_api_credentials.yaml
 EOF
