@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT_DIR"
+
+echo "==> Running Go unit tests..."
+go test ./...
+
+echo "==> Building React frontend..."
+cd "$ROOT_DIR/web"
+npm ci --legacy-peer-deps
+npm run build
+
+echo "==> Verification passed!"
