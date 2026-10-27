@@ -308,6 +308,9 @@ func (c *Client) RestartContainer(name string) error {
 // RestartContainerWithTimeout restarts a container with configurable graceful shutdown timeout
 func (c *Client) RestartContainerWithTimeout(name string, timeoutSecs int) error {
 	if c.isCloudNative() {
+		if c.mode == "kubernetes" {
+			_ = c.triggerKubernetesCrowdSecReload()
+		}
 		return nil
 	}
 	containerID, err := c.GetContainerID(name)

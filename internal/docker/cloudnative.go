@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +18,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"crowdsec-manager/internal/logger"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -78,7 +82,11 @@ func (c *Client) execLocalCommand(cmd []string) (string, error) {
 	args := append([]string{}, cmd[1:]...)
 
 	// Prevent self-termination (e.g. "kill -SIGHUP 1" intended for a separate CrowdSec container)
+	// and instead trigger a Kubernetes rollout reload when running in kubernetes mode.
 	if bin == "kill" || bin == "/bin/kill" || bin == "/usr/bin/kill" {
+		if c.mode == "kubernetes" {
+			_ = c.triggerKubernetesCrowdSecReload()
+		}
 		return "", nil
 	}
 
@@ -464,4 +472,97 @@ func (c *Client) queryLokiLogs(baseURL, serviceName string, limit int) (string, 
 		}
 	}
 	return strings.Join(outLines, "\n"), nil
+}
+
+// triggerKubernetesCrowdSecReload patches the CrowdSec LAPI Deployment and Agent DaemonSet
+// pod template annotations via the Kubernetes In-Cluster API so changes to shared /etc/crowdsec
+// (Hub items, profiles.yaml, simulation.yaml, whitelists) roll out across all nodes.
+func (c *Client) triggerKubernetesCrowdSecReload() error {
+	apiBase := strings.TrimRight(strings.TrimSpace(os.Getenv("KUBERNETES_API_URL")), "/")
+	token := strings.TrimSpace(os.Getenv("KUBERNETES_BEARER_TOKEN"))
+
+	if apiBase == "" {
+		host := strings.TrimSpace(os.Getenv("KUBERNETES_SERVICE_HOST"))
+		port := strings.TrimSpace(os.Getenv("KUBERNETES_SERVICE_PORT"))
+		if host == "" {
+			return nil
+		}
+		if port == "" {
+			port = "443"
+		}
+		apiBase = fmt.Sprintf("https://%s:%s", host, port)
+	}
+
+	if token == "" {
+		rawToken, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
+		if err != nil {
+			return nil
+		}
+		token = strings.TrimSpace(string(rawToken))
+	}
+
+	ns := strings.TrimSpace(os.Getenv("KUBERNETES_NAMESPACE"))
+	if ns == "" {
+		if rawNS, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+			ns = strings.TrimSpace(string(rawNS))
+		}
+	}
+	if ns == "" {
+		ns = "crowdsec"
+	}
+
+	lapiDeploy := strings.TrimSpace(os.Getenv("KUBERNETES_LAPI_DEPLOYMENT"))
+	if lapiDeploy == "" {
+		lapiDeploy = "crowdsec-lapi"
+	}
+	agentDS := strings.TrimSpace(os.Getenv("KUBERNETES_AGENT_DAEMONSET"))
+	if agentDS == "" {
+		agentDS = "crowdsec-agent"
+	}
+
+	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12}
+	if caBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"); err == nil {
+		pool := x509.NewCertPool()
+		if pool.AppendCertsFromPEM(caBytes) {
+			tlsCfg.RootCAs = pool
+		}
+	}
+
+	httpClient := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: &http.Transport{TLSClientConfig: tlsCfg},
+	}
+
+	reloadedAt := time.Now().UTC().Format(time.RFC3339)
+	patchPayload := fmt.Sprintf(`{"spec":{"template":{"metadata":{"annotations":{"crowdninja.io/reloaded-at":%q}}}}}`, reloadedAt)
+
+	targets := []string{
+		fmt.Sprintf("%s/apis/apps/v1/namespaces/%s/deployments/%s", apiBase, url.PathEscape(ns), url.PathEscape(lapiDeploy)),
+		fmt.Sprintf("%s/apis/apps/v1/namespaces/%s/daemonsets/%s", apiBase, url.PathEscape(ns), url.PathEscape(agentDS)),
+	}
+
+	ctx := c.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	for _, endpoint := range targets {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint, strings.NewReader(patchPayload))
+		if err != nil {
+			continue
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/strategic-merge-patch+json")
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			logger.Warn("Kubernetes workload reload request failed", "endpoint", endpoint, "error", err)
+			continue
+		}
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+		resp.Body.Close()
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			logger.Info("Triggered Kubernetes CrowdSec workload reload", "endpoint", endpoint, "reloaded_at", reloadedAt)
+		}
+	}
+	return nil
 }

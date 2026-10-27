@@ -77,7 +77,10 @@ When looking at self-hosted alternatives in the community, I found myself having
 
 ### 1. Kubernetes / K3s (Cloud-Native Mode)
 
-When running on Kubernetes or K3s alongside a CrowdSec LAPI backed by PostgreSQL, CrowdNinja automatically configures `/etc/crowdsec/config.yaml.local`, self-registers its machine credentials against the LAPI, and initializes the Hub index on startup:
+CrowdNinja supports two official Kubernetes deployment topologies depending on your storage class and workflow:
+
+#### Topology A: LAPI & Database Mode *(Zero Shared Storage — Works on any `ReadWriteOnce` storage class)*
+Connects to your shared CrowdSec database (`postgres` / `mysql`) and LAPI HTTP endpoint. Gives you full control over **Decisions (Ban/Unban), Alerts, Boolean Search, Bouncers, LAPI Allowlists, Persistent ASN Bans, Multi-LAPI, OIDC/SSO, and Prometheus/VictoriaLogs metrics**.
 
 ```yaml
 apiVersion: apps/v1
@@ -131,6 +134,57 @@ spec:
             - name: VICTORIALOGS_URL
               value: "http://victorialogs:3100"
 ```
+
+#### Topology B: Full Engine Management Mode *(Shared `ReadWriteMany` PVC + Kubernetes Auto-Reload RBAC)*
+If your cluster provides a `ReadWriteMany` (`RWX`) storage class (such as **Longhorn, CephFS, NFS, OpenEBS, or EFS**), mount a shared `RWX` PVC at `/etc/crowdsec` across `crowdninja`, `crowdsec-lapi`, and `crowdsec-agent`, and bind a namespace-scoped `Role` allowing CrowdNinja to patch `deployments` and `daemonsets`:
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: crowdsec-config-rwx
+  namespace: crowdsec
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 512Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: crowdninja
+  namespace: crowdsec
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: crowdninja-reloader
+  namespace: crowdsec
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "daemonsets"]
+    resourceNames: ["crowdsec-lapi", "crowdsec-agent"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: crowdninja-reloader
+  namespace: crowdsec
+subjects:
+  - kind: ServiceAccount
+    name: crowdninja
+    namespace: crowdsec
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: crowdninja-reloader
+```
+
+With **Topology B**, installing or removing Hub collections/scenarios/parsers, editing `profiles.yaml`, toggling `simulation.yaml`, or adding Parser Whitelists (`mywhitelists.yaml`) in the CrowdNinja UI writes to the shared `RWX` volume and automatically triggers a rolling reload of `crowdsec-lapi` and `crowdsec-agent` across all nodes.
 
 ### 2. Docker Compose
 

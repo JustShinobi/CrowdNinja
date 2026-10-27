@@ -1,6 +1,9 @@
 package docker
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 )
 
@@ -158,5 +161,43 @@ func TestMultiLAPIInstancesSupport(t *testing.T) {
 	}
 	if len(mhc.ListHosts()) != 2 {
 		t.Fatalf("expected 2 LAPI instances after RemoveLAPIInstance")
+	}
+}
+
+func TestKubernetesAutoReloadOnRestartAndSIGHUP(t *testing.T) {
+	var patchCount int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch {
+			atomic.AddInt32(&patchCount, 1)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	t.Setenv("RUNTIME_MODE", "kubernetes")
+	t.Setenv("KUBERNETES_API_URL", srv.URL)
+	t.Setenv("KUBERNETES_BEARER_TOKEN", "test-sa-token")
+	t.Setenv("KUBERNETES_NAMESPACE", "k3s-prod-security")
+	t.Setenv("KUBERNETES_LAPI_DEPLOYMENT", "crowdsec-lapi")
+	t.Setenv("KUBERNETES_AGENT_DAEMONSET", "crowdsec-agent")
+
+	c, err := NewClient()
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+
+	if err := c.RestartContainer("crowdsec"); err != nil {
+		t.Fatalf("RestartContainer failed: %v", err)
+	}
+	if got := atomic.LoadInt32(&patchCount); got != 2 {
+		t.Fatalf("expected 2 PATCH requests (Deployment + DaemonSet), got %d", got)
+	}
+
+	if _, err := c.ExecCommand("crowdsec", []string{"kill", "-SIGHUP", "1"}); err != nil {
+		t.Fatalf("ExecCommand SIGHUP failed: %v", err)
+	}
+	if got := atomic.LoadInt32(&patchCount); got != 4 {
+		t.Fatalf("expected 4 PATCH requests after SIGHUP, got %d", got)
 	}
 }
