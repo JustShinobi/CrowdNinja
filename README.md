@@ -1,241 +1,176 @@
 <div align="center">
-  <h1><a href="https://github.com/hhftechnology/crowdsec_manager">CrowdSec Manager</a></h1>
+  <h1>🥷 CrowdNinja</h1>
+  <p><strong>Cloud-Native Security Operations Center, LAPI Dashboard, Hub & Bouncer Manager for CrowdSec</strong></p>
 
-[![Docker](https://img.shields.io/docker/pulls/hhftechnology/crowdsec-manager?style=flat-square)](https://hub.docker.com/r/hhftechnology/crowdsec-manager)
-![Stars](https://img.shields.io/github/stars/hhftechnology/crowdsec_manager?style=flat-square)
-[![Discord](https://img.shields.io/discord/994247717368909884?logo=discord&style=flat-square)](https://discord.gg/HDCt9MjyMJ)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Status](https://img.shields.io/badge/status-stable-22c55e.svg)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+  [![Runtime: Kubernetes / K3s / Docker](https://img.shields.io/badge/Runtime-Kubernetes%20%7C%20K3s%20%7C%20Docker-326ce5)](https://github.com/JustShinobi/CrowdNinja)
+  [![Observability: Prometheus / VictoriaMetrics / Loki / VictoriaLogs](https://img.shields.io/badge/Observability-Prometheus%20%7C%20VictoriaMetrics%20%7C%20Loki%20%7C%20VictoriaLogs-e6522c)](https://github.com/JustShinobi/CrowdNinja)
 </div>
 
-A web-based management interface for CrowdSec — decisions, alerts, allowlists, scenarios, hub, logs, backups, and Traefik integration.
+---
 
-## Mobile App
+**CrowdNinja** is a lightweight, self-hosted, open-source web interface and Security Operations Center (SOC) for **CrowdSec**.
 
-<div align="center">
-<table>
-  <tr>
-    <td align="center">
-      <a href="https://apps.apple.com/us/app/#"><img width="135" height="39" alt="Download on the App Store" src="https://github.com/user-attachments/assets/45e31a11-cf6b-40a2-a083-6dc8d1f01291" /></a><br>
-      <sub>Coming Soon</sub>
-    </td>
-    <td align="center">
-      <a href="https://play.google.com/store/apps/details?id=com.crowdsec.manager.mobile"><img width="135" height="39" alt="Get it on Google Play" src="https://github.com/user-attachments/assets/acbba639-858f-4c74-85c7-92a4096efbf5" /></a><br>
-      <sub>For Pangolin Users</sub>
-    </td>
-    <td align="center">
-      <a href="https://play.google.com/store/apps/details?id=com.crowdsec.manager.independent"><img width="135" height="39" alt="Get it on Google Play (Independent)" src="https://github.com/user-attachments/assets/acbba639-858f-4c74-85c7-92a4096efbf5" /></a><br>
-      <sub>For Multi Proxy(independent)</sub>
-    </td>
-  </tr>
-</table> 
-</div>
+Built with **Go** and **React + TypeScript + ShadcnUI**, CrowdNinja unifies the best capabilities of the open-source CrowdSec ecosystem into a single ~45 MB binary/container that runs natively on **Kubernetes (K3s/K8s)**, **Proxmox LXC / Bare-Metal**, and **Docker Compose** — with **zero dependency on `/var/run/docker.sock`** when running in Cloud-Native mode.
 
-## Mobile Screenshots
+---
 
-<table>
-  <tr>
-    <td align="center">
-      <img src="images/mobile/3.png" width="180" alt="Connection setup (3.png)"><br>
-      <sub>Connection Setup</sub>
-    </td>
-    <td align="center">
-      <img src="images/mobile/1.png" width="180" alt="Dashboard overview (1.png)"><br>
-      <sub>Dashboard Overview</sub>
-    </td>
-    <td align="center">
-      <img src="images/mobile/2.png" width="180" alt="Security IP check (2.png)"><br>
-      <sub>Security IP Check</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="images/mobile/4.png" width="180" alt="Security alerts list (4.png)"><br>
-      <sub>Security Alerts List</sub>
-    </td>
-    <td align="center">
-      <img src="images/mobile/5.png" width="180" alt="Security metrics (5.png)"><br>
-      <sub>Security Metrics</sub>
-    </td>
-    <td align="center">
-      <img src="images/mobile/6.png" width="180" alt="Logs viewer (6.png)"><br>
-      <sub>Logs Viewer</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="images/mobile/7.png" width="180" alt="Management home (7.png)"><br>
-      <sub>Management Home</sub>
-    </td>
-    <td align="center">
-      <img src="images/mobile/8.png" width="180" alt="Allowlists management (8.png)"><br>
-      <sub>Allowlists Management</sub>
-    </td>
-    <td align="center">
-      <img src="images/mobile/9.png" width="180" alt="Hub management (9.png)"><br>
-      <sub>Hub Management</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="images/mobile/10.png" width="180" alt="Scenarios management (10.png)"><br>
-      <sub>Scenarios Management</sub>
-    </td>
-    <td align="center">
-      <img src="images/mobile/11.png" width="180" alt="Container controls (11.png)"><br>
-      <sub>Container Controls</sub>
-    </td>
-    <td align="center">
-      <img src="images/mobile/12.png" width="180" alt="Terminal shell (12.png)"><br>
-      <sub>Terminal Shell</sub>
-    </td>
-  </tr>
-</table>
+## ✨ Key Features
 
-Native iOS and Android app. Supports **Pangolin** (token-based remote access) and **Basis** (direct URL) connection modes.
+| Domain | Capabilities |
+| :--- | :--- |
+| **Cloud-Native Runtime (`RUNTIME_MODE`)** | Pluggable runtime drivers: **`lapi`** (direct LAPI + local `cscli` + shared DB/filesystem), **`kubernetes`** (K8s/K3s native), and **`docker`** (legacy Docker socket compatibility). Auto-detects environment at startup. |
+| **Decisions & Alerts Explorer** | Real-time active & expired ban management, manual IP/CIDR bans with custom durations/reasons, bulk import/delete, and **Durable Deletion Tombstones** so deleted alerts never reappear during background sync. |
+| **Boolean Structured Search** | Query Decisions and Alerts using structured expressions (`ip:198.51.100.42 AND -origin:CAPI`, `country:CN OR country:RU`, `scenario:"http-probing" AND NOT scope:Range`). |
+| **Persistent ASN Response Engine** | Mark an entire Autonomous System (`AS14061`, etc.) once to automatically ban newly observed IPs from that ASN for a configurable duration (default `168h`), complete with **ASN-specific IP/CIDR exceptions** and **Dry-Run Simulation mode**. |
+| **Graphical Hub, Scenarios & Bouncers** | Browse, install, upgrade, and remove CrowdSec Hub **Collections, Parsers, Scenarios, Postoverflows, and AppSec WAF rules**; manage **Bouncers, Allowlists, Whitelists, and Profiles** from the UI. |
+| **Pluggable Observability (`METRICS` & `LOGS`)** | Native integration with **Prometheus / VictoriaMetrics** (`/api/crowdsec/promql`) for LAPI latency, Bouncer polling, and parser metrics, plus **VictoriaLogs (LogsQL)** and **Grafana Loki (LogQL)** for Traefik/Ingress log correlation. |
 
-## Release
+---
 
-- Version: `2.4.0`
-- Pangolin image: `hhftechnology/crowdsec-manager:latest` — full stack with Traefik, Pangolin, Gerbil
-- Independent image: `hhftechnology/crowdsec-manager:independent` — CrowdSec only, no Traefik
-- Image size (linux/amd64): <!-- IMAGE_SIZE_START -->44MB<!-- IMAGE_SIZE_END -->
+## 🏗️ Pluggable Architecture
 
-## Quick Start
+CrowdNinja is designed from the ground up to fit any self-hosted or production environment without vendor or runtime lock-in:
 
-### Pangolin (full stack)
-
-```bash
-  # Your CrowdSec Manager
-  crowdsec-manager:
-    image: hhftechnology/crowdsec-manager:latest
-    container_name: crowdsec-manager
-    restart: unless-stopped
-    environment:
-      - PORT=8080
-      - ENVIRONMENT=production
-      - TRAEFIK_DYNAMIC_CONFIG=/etc/traefik/dynamic_config.yml
-      - TRAEFIK_CONTAINER_NAME=traefik
-      - TRAEFIK_STATIC_CONFIG=/etc/traefik/traefik_config.yml
-      - CROWDSEC_METRICS_URL=http://crowdsec:6060/metrics
-      - ALERT_LIST_LIMIT=5000
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /root/config:/app/config # pangolin config folder
-      - /root/docker-compose.yml:/app/docker-compose.yml # pangolin compose yml
-      - ./crowdsec-manager/backups:/app/backups
-      - ./crowdsec-manager/data:/app/data
-      # Optional GeoIP database for enriched dashboard location data
-      - ./geoip/GeoLite2-City.mmdb:/app/geoip/GeoLite2-City.mmdb:ro
-    depends_on:
-      crowdsec:
-        condition: service_healthy
-docker compose up -d
+```text
+                       ┌──────────────────────────────────────┐
+                       │         CrowdNinja Web UI            │
+                       │   (React 18 + TypeScript + ShadcnUI) │
+                       └──────────────────┬───────────────────┘
+                                          │ REST / SSE / WebSocket
+                       ┌──────────────────▼───────────────────┐
+                       │       CrowdNinja Go Backend          │
+                       │  • Structured Search Engine          │
+                       │  • Persistent ASN Response Engine    │
+                       │  • Durable Deletion Tombstones       │
+                       └────┬──────────────┬──────────────┬───┘
+                            │              │              │
+         ┌──────────────────┘              │              └──────────────────┐
+         ▼                                 ▼                                 ▼
+┌─────────────────────┐         ┌─────────────────────┐         ┌─────────────────────┐
+│   RUNTIME_MODE      │         │  METRICS_PROVIDER   │         │    LOGS_PROVIDER    │
+├─────────────────────┤         ├─────────────────────┤         ├─────────────────────┤
+│ • lapi (CloudNative)│         │ • PromQL API        │         │ • VictoriaLogs      │
+│ • kubernetes (K3s)  │         │   (Prometheus /     │         │   (LogsQL HTTP API) │
+│ • docker (Socket)   │         │    VictoriaMetrics) │         │ • Grafana Loki      │
+│                     │         │ • Direct (:6060)    │         │   (LogQL HTTP API)  │
+│                     │         │                     │         │ • Local File        │
+└─────────────────────┘         └─────────────────────┘         └─────────────────────┘
 ```
 
-### Independent (CrowdSec only)
+---
 
-```bash
-mkdir -p ./config/crowdsec ./logs/app ./data
+## 🚀 Quick Start
+
+### Option 1: Kubernetes / K3s (Cloud-Native Mode — No Docker Socket)
+
+In Kubernetes or K3s, CrowdNinja runs without `/var/run/docker.sock` by setting `RUNTIME_MODE=kubernetes` (or leaving `RUNTIME_MODE=auto`, which automatically detects `KUBERNETES_SERVICE_HOST`):
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crowdninja
+  namespace: crowdsec
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: crowdninja
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: crowdninja
+    spec:
+      containers:
+        - name: crowdninja
+          image: ghcr.io/justshinobi/crowdninja:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: RUNTIME_MODE
+              value: "kubernetes"
+            - name: CROWDSEC_LAPI_URL
+              value: "http://crowdsec-service:8080"
+            - name: CROWDSEC_METRICS_URL
+              value: "http://crowdsec-service:6060/metrics"
+            - name: PROMETHEUS_URL
+              value: "http://victoriametrics:9090"
+            - name: LOGS_PROVIDER
+              value: "victorialogs"
+            - name: VICTORIALOGS_URL
+              value: "http://victorialogs:3100"
 ```
+
+### Option 2: Docker Compose (Standalone or Full Stack)
 
 ```yaml
 services:
-  crowdsec-manager:
-    image: hhftechnology/crowdsec-manager:independent
-    container_name: crowdsec-manager
+  crowdninja:
+    image: ghcr.io/justshinobi/crowdninja:latest
+    container_name: crowdninja
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
       - PORT=8080
-      - ENVIRONMENT=production
-      - CONFIG_DIR=/app/config
-      - DATABASE_PATH=/app/data/settings.db
-      - INCLUDE_CROWDSEC=true
+      - RUNTIME_MODE=auto
+      - CROWDSEC_LAPI_URL=http://crowdsec:8080
+      - CROWDSEC_METRICS_URL=http://crowdsec:6060/metrics
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - ./config:/app/config
-      - ./logs/app:/app/logs
       - ./data:/app/data
-    networks:
-      - crowdsec-network
-    depends_on:
-      - crowdsec
-
-  crowdsec:
-    image: crowdsecurity/crowdsec:latest
-    container_name: crowdsec
-    environment:
-      - COLLECTIONS=crowdsecurity/linux
-    volumes:
-      - ./config/crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
-      - crowdsec-db:/var/lib/crowdsec/data/
-      - crowdsec-config:/etc/crowdsec/
-    networks:
-      - crowdsec-network
-
-networks:
-  crowdsec-network:
-    driver: bridge
-
-volumes:
-  crowdsec-db:
-  crowdsec-config:
+      - ./logs:/app/logs
 ```
 
-```bash
-docker compose up -d
-curl http://localhost:8080/api/health/stack
-```
+---
 
-## Screenshots
+## ⚙️ Environment Variables Reference
 
-<img width="1200" height="630" alt="Alerts Analysis Filters" src="/images/alerts-analysis-filters.jpeg"/>
-<img width="1200" height="630" alt="Alerts Analysis Inspect Modal" src="/images/alerts-analysis-inspect-modal.jpeg"/>
-<img width="1200" height="630" alt="Alerts Analysis Overview" src="/images/alerts-analysis-overview.jpeg"/>
-<img width="1200" height="630" alt="Alerts Analysis Results Table" src="/images/alerts-analysis-results-table.jpeg"/>
-<img width="1200" height="630" alt="Allowlists Management" src="/images/allowlists-management.jpeg"/>
-<img width="1200" height="630" alt="Backup Management" src="/images/backup-management.jpeg"/>
-<img width="1200" height="630" alt="Bouncers Management" src="/images/bouncers-management.jpeg"/>
-<img width="1200" height="630" alt="Captcha Protection Detect" src="/images/captcha-protection-detect.jpeg"/>
-<img width="1200" height="630" alt="Config Validation" src="/images/config-validation.jpeg"/>
-<img width="1200" height="630" alt="Configuration Settings" src="/images/configuration-settings.jpeg"/>
-<img width="1200" height="630" alt="Crowdsec Health Overview" src="/images/crowdsec-health-overview.jpeg"/>
-<img width="1200" height="630" alt="Dashboard Overview Countries Systems" src="/images/dashboard-overview-countries-systems.jpeg"/>
-<img width="1200" height="630" alt="Dashboard Overview Scenarios Blocked Ips" src="/images/dashboard-overview-scenarios-blocked-ips.jpeg"/>
-<img width="1200" height="630" alt="Decisions Analysis Overview" src="/images/decisions-analysis-overview.jpeg"/>
-<img width="1200" height="630" alt="Decisions Results Table" src="/images/decisions-results-table.jpeg"/>
-<img width="1200" height="630" alt="Health Diagnostics Overview" src="/images/health-diagnostics-overview.jpeg"/>
-<img width="1200" height="630" alt="Hub Appsec Configurations" src="/images/hub-appsec-configurations.jpeg"/>
-<img width="1200" height="630" alt="Hub Appsec Rules" src="/images/hub-appsec-rules.jpeg"/>
-<img width="1200" height="630" alt="Hub Collections" src="/images/hub-collections.jpeg"/>
-<img width="1200" height="630" alt="Hub Home Categories" src="/images/hub-home-categories.jpeg"/>
-<img width="1200" height="630" alt="Hub Log Parsers" src="/images/hub-log-parsers.jpeg"/>
-<img width="1200" height="630" alt="Hub Postoverflows" src="/images/hub-postoverflows.jpeg"/>
-<img width="1200" height="630" alt="Hub Remediation Components" src="/images/hub-remediation-components.jpeg"/>
-<img width="1200" height="630" alt="Hub Scenarios Install Mode" src="/images/hub-scenarios-install-mode.jpeg"/>
-<img width="1200" height="630" alt="Ip Management" src="/images/ip-management.jpeg"/>
-<img width="1200" height="630" alt="Logs Service Logs" src="/images/logs-service-logs.jpeg"/>
-<img width="1200" height="630" alt="Notifications Detect" src="/images/notifications-detect.jpeg"/>
-<img width="1200" height="630" alt="Scenarios Management" src="/images/scenarios-management.jpeg"/>
-<img width="1200" height="630" alt="Services Management" src="/images/services-management.jpeg"/>
-<img width="1200" height="630" alt="System Update" src="/images/system-update.jpeg"/>
-<img width="1200" height="630" alt="Terminal Container Shell" src="/images/terminal-container-shell.png"/>
-<img width="1200" height="630" alt="Whitelist Management" src="/images/whitelist-management.jpeg"/>
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `PORT` | `8080` | HTTP server listen port |
+| `RUNTIME_MODE` | `auto` | `auto`, `lapi`, `kubernetes`, or `docker` |
+| `CROWDSEC_LAPI_URL` | `http://localhost:8080` | CrowdSec Local API URL |
+| `CROWDSEC_CONFIG_FILE` | `/etc/crowdsec/config.yaml` | Path to CrowdSec configuration for local `cscli` operations |
+| `CROWDSEC_CSCLI_BIN` | `cscli` | Path or binary name for `cscli` |
+| `CROWDSEC_METRICS_URL` | `http://localhost:6060/metrics` | Direct Prometheus metrics endpoint on CrowdSec |
+| `PROMETHEUS_URL` | *(empty)* | Optional Prometheus or VictoriaMetrics base URL for `/api/crowdsec/promql` |
+| `LOGS_PROVIDER` | `file` | `file`, `victorialogs`, or `loki` |
+| `VICTORIALOGS_URL` | *(empty)* | Base URL for VictoriaLogs (`http://victorialogs:3100`) |
+| `LOKI_URL` | *(empty)* | Base URL for Grafana Loki (`http://loki:3100`) |
+| `GEOIP_DB_PATH` | `/app/geoip/GeoLite2-City.mmdb` | Optional MaxMind GeoLite2 City database path |
 
+---
 
+## 🔌 New REST API Endpoints in CrowdNinja
 
-## Documentation
+### Persistent ASN Response (`/api/asn`)
+* `GET /api/asn/rules` — List all persistent ASN ban rules.
+* `POST /api/asn/rules` — Create or update an ASN rule (`asn`, `as_name`, `action`, `duration`, `reason`, `dry_run`, `enabled`).
+* `DELETE /api/asn/rules/:asn` — Remove a persistent ASN rule.
+* `GET /api/asn/exceptions?asn=AS14061` — List IP/CIDR exceptions for an ASN.
+* `POST /api/asn/exceptions` — Add an IP or CIDR subnet exception (`asn`, `ip_or_cidr`, `note`).
+* `DELETE /api/asn/exceptions/:id` — Delete an exception by ID.
+* `POST /api/asn/evaluate` — Evaluate an observed `{ "ip": "...", "asn": "..." }` against active ASN rules (respects CIDR exceptions and `dry_run` simulation mode).
 
-Full installation guide, configuration reference, mobile app setup, and API docs:
-[crowdsec-manager.hhf.technology](https://crowdsec-manager.hhf.technology)
+### Structured Search & PromQL Metrics (`/api/crowdsec`)
+* `GET /api/crowdsec/decisions/analysis?q=ip:198.51.100.0/24+AND+-origin:CAPI` — Filter decisions using boolean structured queries.
+* `GET /api/crowdsec/promql?query=...` — Query runtime CrowdSec metrics from Prometheus or VictoriaMetrics.
 
-## License
+---
 
-MIT — see [LICENSE](LICENSE).
+## 🙏 Acknowledgments & Lineage
 
-## Support
+CrowdNinja stands on the shoulders of three great open-source projects in the CrowdSec ecosystem:
+* [**hhftechnology/crowdsec_manager**](https://github.com/hhftechnology/crowdsec_manager) — Go + React ShadcnUI foundation, Hub Browser, Bouncer/Allowlist/Profile management.
+* [**TheDuffman85/crowdsec-web-ui**](https://github.com/TheDuffman85/crowdsec-web-ui) — Inspiration for boolean structured search, durable deletion tombstones, and Prometheus runtime metrics.
+* [**OpenSecDash**](https://opensecdash.app/) — Inspiration for persistent ASN response policies, CIDR exceptions, dry-run simulation, and log correlation workflows.
 
-- [GitHub Issues](https://github.com/hhftechnology/crowdsec_manager/issues)
-- [Discord](https://discord.gg/HDCt9MjyMJ)
+## 📄 License
+
+Released under the [MIT License](LICENSE).

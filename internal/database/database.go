@@ -147,6 +147,42 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_feature_configs_feature ON feature_configs
 		return fmt.Errorf("failed to create feature_configs table: %w", err)
 	}
 
+	createCrowdNinjaTables := `
+	CREATE TABLE IF NOT EXISTS asn_rules (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		asn TEXT NOT NULL UNIQUE,
+		as_name TEXT NOT NULL DEFAULT '',
+		action TEXT NOT NULL DEFAULT 'ban',
+		duration TEXT NOT NULL DEFAULT '168h',
+		reason TEXT NOT NULL DEFAULT 'crowdninja/persistent-asn-ban',
+		dry_run INTEGER NOT NULL DEFAULT 0,
+		enabled INTEGER NOT NULL DEFAULT 1,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS asn_exceptions (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		asn TEXT NOT NULL,
+		ip_or_cidr TEXT NOT NULL,
+		note TEXT NOT NULL DEFAULT '',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(asn, ip_or_cidr)
+	);
+
+	CREATE TABLE IF NOT EXISTS deletion_tombstones (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		target_type TEXT NOT NULL,
+		target_id TEXT NOT NULL,
+		ip_value TEXT NOT NULL DEFAULT '',
+		expires_at DATETIME NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(target_type, target_id)
+	);`
+	if _, err := d.db.Exec(createCrowdNinjaTables); err != nil {
+		return fmt.Errorf("failed to create crowdninja tables: %w", err)
+	}
+
 	// Apply migrations for existing databases with older schemas
 	// Errors are intentionally ignored since columns may already exist
 	migrations := []string{
@@ -551,4 +587,171 @@ func (d *Database) MarkFeatureApplied(feature string) error {
 		WHERE feature = ?
 	`, feature)
 	return err
+}
+
+// ASNRule represents a persistent ASN response policy (OpenSecDash integration).
+type ASNRule struct {
+	ID        int64  `json:"id"`
+	ASN       string `json:"asn"`
+	ASName    string `json:"as_name"`
+	Action    string `json:"action"`
+	Duration  string `json:"duration"`
+	Reason    string `json:"reason"`
+	DryRun    bool   `json:"dry_run"`
+	Enabled   bool   `json:"enabled"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+// ASNException represents an ASN-specific IP/CIDR exception.
+type ASNException struct {
+	ID        int64  `json:"id"`
+	ASN       string `json:"asn"`
+	IPOrCIDR  string `json:"ip_or_cidr"`
+	Note      string `json:"note"`
+	CreatedAt string `json:"created_at"`
+}
+
+// UpsertASNRule inserts or updates a persistent ASN ban rule.
+func (d *Database) UpsertASNRule(rule *ASNRule) error {
+	dryRun := 0
+	if rule.DryRun {
+		dryRun = 1
+	}
+	enabled := 1
+	if !rule.Enabled {
+		enabled = 0
+	}
+	if rule.Action == "" {
+		rule.Action = "ban"
+	}
+	if rule.Duration == "" {
+		rule.Duration = "168h"
+	}
+	if rule.Reason == "" {
+		rule.Reason = "crowdninja/persistent-asn-ban"
+	}
+	_, err := d.db.Exec(`
+		INSERT INTO asn_rules (asn, as_name, action, duration, reason, dry_run, enabled, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(asn) DO UPDATE SET
+			as_name    = excluded.as_name,
+			action     = excluded.action,
+			duration   = excluded.duration,
+			reason     = excluded.reason,
+			dry_run    = excluded.dry_run,
+			enabled    = excluded.enabled,
+			updated_at = CURRENT_TIMESTAMP
+	`, strings.ToUpper(strings.TrimSpace(rule.ASN)), rule.ASName, rule.Action, rule.Duration, rule.Reason, dryRun, enabled)
+	return err
+}
+
+// ListASNRules returns all configured ASN response rules.
+func (d *Database) ListASNRules() ([]ASNRule, error) {
+	rows, err := d.db.Query(`
+		SELECT id, asn, as_name, action, duration, reason, dry_run, enabled, created_at, updated_at
+		FROM asn_rules
+		ORDER BY asn
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	rules := []ASNRule{}
+	for rows.Next() {
+		var r ASNRule
+		var dryRun, enabled int
+		if err := rows.Scan(&r.ID, &r.ASN, &r.ASName, &r.Action, &r.Duration, &r.Reason, &dryRun, &enabled, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, err
+		}
+		r.DryRun = dryRun == 1
+		r.Enabled = enabled == 1
+		rules = append(rules, r)
+	}
+	return rules, rows.Err()
+}
+
+// DeleteASNRule deletes a persistent ASN rule by ASN identifier.
+func (d *Database) DeleteASNRule(asn string) error {
+	_, err := d.db.Exec(`DELETE FROM asn_rules WHERE asn = ?`, strings.ToUpper(strings.TrimSpace(asn)))
+	return err
+}
+
+// AddASNException adds an IP or CIDR exception for a given ASN.
+func (d *Database) AddASNException(exc *ASNException) error {
+	_, err := d.db.Exec(`
+		INSERT INTO asn_exceptions (asn, ip_or_cidr, note)
+		VALUES (?, ?, ?)
+		ON CONFLICT(asn, ip_or_cidr) DO UPDATE SET note = excluded.note
+	`, strings.ToUpper(strings.TrimSpace(exc.ASN)), strings.TrimSpace(exc.IPOrCIDR), exc.Note)
+	return err
+}
+
+// ListASNExceptions lists ASN IP/CIDR exceptions (optionally filtered by ASN).
+func (d *Database) ListASNExceptions(asn string) ([]ASNException, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if strings.TrimSpace(asn) != "" {
+		rows, err = d.db.Query(`SELECT id, asn, ip_or_cidr, note, created_at FROM asn_exceptions WHERE asn = ? ORDER BY id DESC`, strings.ToUpper(strings.TrimSpace(asn)))
+	} else {
+		rows, err = d.db.Query(`SELECT id, asn, ip_or_cidr, note, created_at FROM asn_exceptions ORDER BY id DESC`)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []ASNException{}
+	for rows.Next() {
+		var e ASNException
+		if err := rows.Scan(&e.ID, &e.ASN, &e.IPOrCIDR, &e.Note, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// DeleteASNException removes an ASN exception by ID.
+func (d *Database) DeleteASNException(id int64) error {
+	_, err := d.db.Exec(`DELETE FROM asn_exceptions WHERE id = ?`, id)
+	return err
+}
+
+// AddDeletionTombstone stores a durable deletion tombstone so deleted alerts/decisions
+// are not restored during background sync (ported from crowdsec-web-ui).
+func (d *Database) AddDeletionTombstone(targetType, targetID, ipValue string) error {
+	_, err := d.db.Exec(`
+		INSERT INTO deletion_tombstones (target_type, target_id, ip_value, expires_at)
+		VALUES (?, ?, ?, datetime('now', '+24 hours'))
+		ON CONFLICT(target_type, target_id) DO UPDATE SET
+			ip_value   = excluded.ip_value,
+			expires_at = datetime('now', '+24 hours')
+	`, targetType, targetID, ipValue)
+	return err
+}
+
+// ActiveTombstoneIDs returns the set of active tombstone target IDs for a given targetType.
+func (d *Database) ActiveTombstoneIDs(targetType string) (map[string]bool, error) {
+	rows, err := d.db.Query(`
+		SELECT target_id FROM deletion_tombstones
+		WHERE target_type = ? AND expires_at > datetime('now')
+	`, targetType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := make(map[string]bool)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		res[id] = true
+	}
+	return res, rows.Err()
 }

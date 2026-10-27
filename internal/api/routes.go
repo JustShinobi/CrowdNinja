@@ -172,6 +172,7 @@ func RegisterServicesRoutes(router *gin.RouterGroup, dockerClient *docker.Client
 		crowdsec.GET("/history/config", handlers.GetHistoryConfig())
 		crowdsec.PUT("/history/config", handlers.UpdateHistoryConfig())
 		crowdsec.GET("/metrics", handlers.GetMetrics(dockerClient, cfg, c))
+		crowdsec.GET("/promql", handlers.QueryPromQLMetrics(cfg))
 		crowdsec.POST("/enroll", handlers.EnrollCrowdSec(dockerClient, db, cfg))
 		crowdsec.POST("/enroll/finalize", handlers.FinalizeCrowdSecEnrollment(dockerClient, cfg))
 		crowdsec.GET("/enroll/preferences", handlers.GetCrowdSecEnrollmentPreferences(db))
@@ -286,4 +287,18 @@ func RegisterSimulationRoutes(router *gin.RouterGroup, dockerClient *docker.Clie
 func RegisterEventRoutes(router *gin.RouterGroup, hub *messaging.Hub) {
 	router.GET("/events/ws", handlers.EventsWebSocket(hub))
 	router.GET("/events/sse", handlers.EventsSSE(hub))
+}
+
+// RegisterASNRoutes configures endpoints for persistent ASN response rules and IP/CIDR exceptions
+func RegisterASNRoutes(router *gin.RouterGroup, db *database.Database, dockerClient *docker.Client, cfg *config.Config, ttlCache ...*cache.TTLCache) {
+	asn := router.Group("/asn")
+	{
+		asn.GET("/rules", handlers.ListASNRules(db))
+		asn.POST("/rules", handlers.UpsertASNRule(db))
+		asn.DELETE("/rules/:asn", handlers.DeleteASNRule(db))
+		asn.GET("/exceptions", handlers.ListASNExceptions(db))
+		asn.POST("/exceptions", handlers.AddASNException(db))
+		asn.DELETE("/exceptions/:id", handlers.DeleteASNException(db))
+		asn.POST("/evaluate", handlers.EvaluateASNEvent(db, dockerClient, cfg, ttlCache...))
+	}
 }

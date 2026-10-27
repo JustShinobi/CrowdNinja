@@ -21,23 +21,35 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
-// Client wraps the Docker SDK client with convenience methods for container management
+// Client wraps the Docker SDK client (or Cloud-Native LAPI/Kubernetes runtime driver)
+// with convenience methods for container and CrowdSec management.
 type Client struct {
-	cli *client.Client
-	ctx context.Context
+	cli  *client.Client
+	ctx  context.Context
+	mode string // "docker", "lapi", or "kubernetes"
 }
 
-// NewClient creates a new Docker API client with automatic version negotiation
-// Uses environment variables (DOCKER_HOST, DOCKER_API_VERSION, etc.) if set
+// NewClient creates a new runtime client with automatic mode detection
+// Uses RUNTIME_MODE ("auto", "docker", "lapi", "kubernetes") and DOCKER_HOST if set.
 func NewClient() (*Client, error) {
+	mode := ResolveRuntimeMode()
+	if mode != "docker" {
+		return &Client{
+			cli:  nil,
+			ctx:  context.Background(),
+			mode: mode,
+		}, nil
+	}
+
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
 
 	return &Client{
-		cli: cli,
-		ctx: context.Background(),
+		cli:  cli,
+		ctx:  context.Background(),
+		mode: "docker",
 	}, nil
 }
 
@@ -46,24 +58,34 @@ func NewClient() (*Client, error) {
 // when the HTTP request is cancelled.
 func (c *Client) WithContext(ctx context.Context) *Client {
 	return &Client{
-		cli: c.cli,
-		ctx: ctx,
+		cli:  c.cli,
+		ctx:  ctx,
+		mode: c.mode,
 	}
 }
 
 // Close gracefully closes the Docker client connection
 func (c *Client) Close() error {
+	if c.isCloudNative() || c.cli == nil {
+		return nil
+	}
 	return c.cli.Close()
 }
 
-// Ping verifies connectivity to the Docker daemon
+// Ping verifies connectivity to the active runtime backend
 func (c *Client) Ping() error {
+	if c.isCloudNative() {
+		return c.pingCloudNative()
+	}
 	_, err := c.cli.Ping(c.ctx)
 	return err
 }
 
 // ContainerExists checks if a container with the given name exists (running or stopped)
 func (c *Client) ContainerExists(name string) (bool, error) {
+	if c.isCloudNative() {
+		return true, nil
+	}
 	containers, err := c.cli.ContainerList(c.ctx, container.ListOptions{
 		All: true,
 		Filters: filters.NewArgs(
@@ -78,6 +100,9 @@ func (c *Client) ContainerExists(name string) (bool, error) {
 
 // IsContainerRunning checks if a container is running
 func (c *Client) IsContainerRunning(name string) (bool, error) {
+	if c.isCloudNative() {
+		return true, nil
+	}
 	containers, err := c.cli.ContainerList(c.ctx, container.ListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("name", "^/"+name+"$"),
@@ -92,6 +117,9 @@ func (c *Client) IsContainerRunning(name string) (bool, error) {
 
 // GetContainerID gets the container ID by name
 func (c *Client) GetContainerID(name string) (string, error) {
+	if c.isCloudNative() {
+		return "cloudnative-" + name, nil
+	}
 	containers, err := c.cli.ContainerList(c.ctx, container.ListOptions{
 		All: true,
 		Filters: filters.NewArgs(
@@ -107,10 +135,13 @@ func (c *Client) GetContainerID(name string) (string, error) {
 	return containers[0].ID, nil
 }
 
-// ExecCommand executes a command inside a running container and returns stdout
+// ExecCommand executes a command inside a running container (or locally in Cloud-Native mode) and returns stdout
 // Critical for running CrowdSec CLI commands (cscli) for managing decisions, bouncers, etc.
 // Properly handles Docker stream protocol to avoid corrupted JSON output
 func (c *Client) ExecCommand(containerName string, cmd []string) (string, error) {
+	if c.isCloudNative() {
+		return c.execLocalCommand(cmd)
+	}
 	containerID, err := c.GetContainerID(containerName)
 	if err != nil {
 		return "", err
@@ -189,6 +220,9 @@ func stripControlCharacters(s string) string {
 
 // GetContainerLogs retrieves and returns container logs with optional tail limit
 func (c *Client) GetContainerLogs(containerName string, tail string) (string, error) {
+	if c.isCloudNative() {
+		return c.fetchCloudNativeLogs(containerName, tail)
+	}
 	containerID, err := c.GetContainerID(containerName)
 	if err != nil {
 		return "", err
@@ -238,6 +272,13 @@ func (c *Client) GetContainerLogs(containerName string, tail string) (string, er
 // mode. The caller is responsible for closing the returned ReadCloser.
 // If since is non-empty, only logs after that timestamp are returned.
 func (c *Client) FollowContainerLogs(containerName, since string) (io.ReadCloser, error) {
+	if c.isCloudNative() {
+		logs, err := c.fetchCloudNativeLogs(containerName, "50")
+		if err != nil {
+			return nil, err
+		}
+		return io.NopCloser(strings.NewReader(logs)), nil
+	}
 	containerID, err := c.GetContainerID(containerName)
 	if err != nil {
 		return nil, err
@@ -262,6 +303,9 @@ func (c *Client) RestartContainer(name string) error {
 
 // RestartContainerWithTimeout restarts a container with configurable graceful shutdown timeout
 func (c *Client) RestartContainerWithTimeout(name string, timeoutSecs int) error {
+	if c.isCloudNative() {
+		return nil
+	}
 	containerID, err := c.GetContainerID(name)
 	if err != nil {
 		return err
@@ -279,6 +323,9 @@ func (c *Client) StopContainer(name string) error {
 
 // StopContainerWithTimeout stops a container with a custom timeout
 func (c *Client) StopContainerWithTimeout(name string, timeoutSecs int) error {
+	if c.isCloudNative() {
+		return nil
+	}
 	containerID, err := c.GetContainerID(name)
 	if err != nil {
 		return err
@@ -291,6 +338,9 @@ func (c *Client) StopContainerWithTimeout(name string, timeoutSecs int) error {
 
 // StartContainer starts a container
 func (c *Client) StartContainer(name string) error {
+	if c.isCloudNative() {
+		return nil
+	}
 	containerID, err := c.GetContainerID(name)
 	if err != nil {
 		return err
@@ -301,11 +351,17 @@ func (c *Client) StartContainer(name string) error {
 
 // ListContainers lists all containers
 func (c *Client) ListContainers(all bool) ([]types.Container, error) {
+	if c.isCloudNative() {
+		return c.syntheticContainers(), nil
+	}
 	return c.cli.ContainerList(c.ctx, container.ListOptions{All: all})
 }
 
 // CopyFromContainer copies a file from a container
 func (c *Client) CopyFromContainer(containerName, srcPath string) (io.ReadCloser, error) {
+	if c.isCloudNative() {
+		return c.copyFromLocalFile(srcPath)
+	}
 	containerID, err := c.GetContainerID(containerName)
 	if err != nil {
 		return nil, err
@@ -317,6 +373,9 @@ func (c *Client) CopyFromContainer(containerName, srcPath string) (io.ReadCloser
 
 // CopyToContainer copies a file to a container
 func (c *Client) CopyToContainer(containerName, dstPath string, content io.Reader) error {
+	if c.isCloudNative() {
+		return c.copyToLocalFile(dstPath, content)
+	}
 	containerID, err := c.GetContainerID(containerName)
 	if err != nil {
 		return err
@@ -329,6 +388,9 @@ func (c *Client) CopyToContainer(containerName, dstPath string, content io.Reade
 // Docker copy API. This avoids shell interpolation entirely, preventing
 // injection attacks from user-supplied data.
 func (c *Client) WriteFileToContainer(containerName, filePath string, content []byte) error {
+	if c.isCloudNative() {
+		return c.writeLocalFile(filePath, content)
+	}
 	containerID, err := c.GetContainerID(containerName)
 	if err != nil {
 		return err
@@ -362,6 +424,9 @@ func (c *Client) WriteFileToContainer(containerName, filePath string, content []
 // ReadFileFromContainer reads a file from inside a container and returns its
 // content as a string. Uses the Docker copy API (no shell needed).
 func (c *Client) ReadFileFromContainer(containerName, filePath string) (string, error) {
+	if c.isCloudNative() {
+		return c.readLocalFile(filePath)
+	}
 	containerID, err := c.GetContainerID(containerName)
 	if err != nil {
 		return "", err
@@ -454,6 +519,9 @@ func (c *Client) AppendLineToFileInContainer(containerName, filePath, afterLine,
 
 // GetContainerStats gets container statistics
 func (c *Client) GetContainerStats(name string) (*container.StatsResponse, error) {
+	if c.isCloudNative() {
+		return &container.StatsResponse{}, nil
+	}
 	containerID, err := c.GetContainerID(name)
 	if err != nil {
 		return nil, err
@@ -475,6 +543,9 @@ func (c *Client) GetContainerStats(name string) (*container.StatsResponse, error
 
 // InspectContainer inspects a container
 func (c *Client) InspectContainer(name string) (*types.ContainerJSON, error) {
+	if c.isCloudNative() {
+		return c.inspectSyntheticContainer(name)
+	}
 	containerID, err := c.GetContainerID(name)
 	if err != nil {
 		return nil, err
@@ -500,6 +571,9 @@ func (c *Client) GetClient() *client.Client {
 
 // FileExists checks if a file or directory exists inside a container
 func (c *Client) FileExists(containerName, path string) (bool, error) {
+	if c.isCloudNative() {
+		return c.localFileExists(path)
+	}
 	containerID, err := c.GetContainerID(containerName)
 	if err != nil {
 		return false, err

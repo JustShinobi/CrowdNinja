@@ -194,6 +194,9 @@ func main() {
 
 		// Config validation routes
 		api.RegisterConfigValidationRoutes(apiGroup, validator)
+
+		// Persistent ASN Response & Exception routes (CrowdNinja)
+		api.RegisterASNRoutes(apiGroup, db, dockerClient, cfg, ttlCache)
 	}
 
 	// Bridge NATS events to WebSocket hub (if both are available)

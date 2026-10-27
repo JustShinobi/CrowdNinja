@@ -17,12 +17,25 @@ type Config struct {
 	LogLevel    string
 	LogFile     string
 
-	// Docker configuration
-	DockerHost  string
-	DockerHosts string // Multi-host format: "id:endpoint,id:endpoint"
-	ComposeFile string
-	PangolinDir string
-	ConfigDir   string
+	// Docker & Cloud-Native Runtime configuration
+	RuntimeMode  string // "auto", "docker", "lapi", "kubernetes"
+	DockerHost   string
+	DockerHosts  string // Multi-host format: "id:endpoint,id:endpoint"
+	ComposeFile  string
+	PangolinDir  string
+	ConfigDir    string
+
+	// Cloud-Native CrowdSec & Observability Providers
+	CrowdSecLAPIURL          string
+	CrowdSecLAPIKey          string
+	CrowdSecConfigFile       string
+	CrowdSecCSCLIBin         string
+	PrometheusURL            string
+	LogsProvider             string // "file", "victorialogs", "loki"
+	VictoriaLogsURL          string
+	LokiURL                  string
+	KubernetesNamespace      string
+	KubernetesAgentDaemonSet string
 
 	// Database
 	DatabasePath        string
@@ -100,11 +113,22 @@ func Load() (*Config, error) {
 		Environment:              getEnv("ENVIRONMENT", "development"),
 		LogLevel:                 getEnv("LOG_LEVEL", "info"),
 		LogFile:                  getEnv("LOG_FILE", "./logs/crowdsec-manager.log"),
+		RuntimeMode:              getEnv("RUNTIME_MODE", "auto"),
 		DockerHost:               getEnv("DOCKER_HOST", ""),
 		DockerHosts:              getEnv("DOCKER_HOSTS", ""),
 		ComposeFile:              getEnv("COMPOSE_FILE", "./docker-compose.yml"),
 		PangolinDir:              getEnv("PANGOLIN_DIR", "."),
 		ConfigDir:                getEnv("CONFIG_DIR", "./config"),
+		CrowdSecLAPIURL:          getEnv("CROWDSEC_LAPI_URL", "http://localhost:8080"),
+		CrowdSecLAPIKey:          getEnv("CROWDSEC_LAPI_KEY", ""),
+		CrowdSecConfigFile:       getEnv("CROWDSEC_CONFIG_FILE", "/etc/crowdsec/config.yaml"),
+		CrowdSecCSCLIBin:         getEnv("CROWDSEC_CSCLI_BIN", "cscli"),
+		PrometheusURL:            getEnv("PROMETHEUS_URL", ""),
+		LogsProvider:             getEnv("LOGS_PROVIDER", "file"),
+		VictoriaLogsURL:          getEnv("VICTORIALOGS_URL", ""),
+		LokiURL:                  getEnv("LOKI_URL", ""),
+		KubernetesNamespace:      getEnv("KUBERNETES_NAMESPACE", "crowdsec"),
+		KubernetesAgentDaemonSet: getEnv("KUBERNETES_AGENT_DAEMONSET", "crowdsec-agent"),
 		DatabasePath:             getEnv("DATABASE_PATH", "./data/settings.db"),
 		HistoryDatabasePath:      getEnv("HISTORY_DATABASE_PATH", "./data/history.db"),
 		TraefikDynamicConfig:     getEnv("TRAEFIK_DYNAMIC_CONFIG", "/etc/traefik/dynamic_config.yml"),

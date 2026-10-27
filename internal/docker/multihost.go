@@ -35,15 +35,19 @@ func NewMultiHostClient(hostsConfig string) (*MultiHostClient, error) {
 	}
 
 	if hostsConfig == "" {
-		// Fallback: single host from environment (DOCKER_HOST or default socket)
+		// Fallback: single host from environment (DOCKER_HOST, default socket, or Cloud-Native LAPI/Kubernetes mode)
 		c, err := NewClient()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create default docker client: %w", err)
+			return nil, fmt.Errorf("failed to create default runtime client: %w", err)
+		}
+		endpoint := "unix:///var/run/docker.sock"
+		if c.isCloudNative() {
+			endpoint = "cloudnative://" + c.mode
 		}
 		mhc.clients["local"] = c
 		mhc.defaultID = "local"
-		mhc.hosts = []HostInfo{{ID: "local", Endpoint: "unix:///var/run/docker.sock", IsLocal: true}}
-		logger.Info("Multi-host Docker client initialized with single default host")
+		mhc.hosts = []HostInfo{{ID: "local", Endpoint: endpoint, IsLocal: true}}
+		logger.Info("Runtime client initialized", "mode", c.RuntimeMode(), "endpoint", endpoint)
 		return mhc, nil
 	}
 

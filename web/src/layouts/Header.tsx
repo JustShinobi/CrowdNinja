@@ -94,7 +94,7 @@ export default function Header({ onMenuClick, isCollapsed, onToggleCollapse }: H
           </Button>
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-base font-semibold truncate">CrowdSec Manager</span>
+              <span className="text-base font-semibold truncate">CrowdNinja</span>
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 uppercase">
                 {import.meta.env.MODE}
               </Badge>
@@ -151,7 +151,7 @@ export default function Header({ onMenuClick, isCollapsed, onToggleCollapse }: H
         <div className="hidden md:flex items-center gap-2 mr-2">
           <Button variant="outline" asChild className="gap-2">
             <a
-              href="https://github.com/hhftechnology/crowdsec_manager"
+              href="https://github.com/JustShinobi/CrowdNinja"
               target="_blank"
               rel="noopener noreferrer"
             >

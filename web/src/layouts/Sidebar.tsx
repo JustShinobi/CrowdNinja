@@ -34,7 +34,7 @@ export default function Sidebar({ isCollapsed, onNavigate }: SidebarProps) {
           <div className="flex items-center gap-2 font-semibold text-lg">
             <Shield className="h-6 w-6 text-primary" />
             <div className="flex flex-col">
-              <span>CrowdSec Manager</span>
+              <span>CrowdNinja</span>
               <Badge variant="secondary" className="text-[10px] px-1 py-0 h-5 mt-1 w-fit whitespace-nowrap">
               v{import.meta.env.VITE_APP_VERSION}
               </Badge>
@@ -121,15 +121,7 @@ export default function Sidebar({ isCollapsed, onNavigate }: SidebarProps) {
         <div className={cn("flex items-center", isCollapsed ? "justify-center" : "justify-between gap-2")}>
           {!isCollapsed && (
             <p className="text-[10px] text-muted-foreground text-left leading-tight shrink-0">
-              &copy; {new Date().getFullYear()} Crowdsec Manager by {' '}
-            <a
-            href="https://forum.hhf.technology"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            HHF Technology
-          </a>
+              &copy; {new Date().getFullYear()} CrowdNinja — Open-Source Cloud-Native SecOps
             </p>
           )}
         </div>

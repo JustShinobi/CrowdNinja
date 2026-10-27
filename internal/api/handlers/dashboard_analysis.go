@@ -159,6 +159,25 @@ func GetDecisionsAnalysis(dockerClient *docker.Client, cfg *config.Config, ttlCa
 			"count", len(decisions),
 			"cmd", cmd)
 
+		if q := strings.TrimSpace(c.Query("q")); q != "" {
+			filtered := make([]models.Decision, 0, len(decisions))
+			for _, d := range decisions {
+				fields := map[string]string{
+					"id":       strconv.FormatInt(d.ID, 10),
+					"ip":       d.Value,
+					"value":    d.Value,
+					"scenario": d.Scenario,
+					"origin":   d.Origin,
+					"type":     d.Type,
+					"scope":    d.Scope,
+				}
+				if MatchStructuredQuery(q, fields) {
+					filtered = append(filtered, d)
+				}
+			}
+			decisions = filtered
+		}
+
 		total := len(decisions)
 		pagedDecisions := paginateDecisions(decisions, limit, offset)
 		result := gin.H{
