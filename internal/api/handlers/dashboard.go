@@ -187,9 +187,11 @@ func GetMetrics(dockerClient *docker.Client, cfg *config.Config, ttlCache ...*ca
 
 		logger.Info("Getting CrowdSec metrics")
 
-		output, err := dockerClient.ExecCommand(cfg.CrowdsecContainerName, []string{
-			"cscli", "metrics", "-o", "json",
-		})
+		cmd := []string{"cscli", "metrics", "-o", "json"}
+		if cfg.CrowdSecMetricsURL != "" {
+			cmd = append(cmd, "--url", cfg.CrowdSecMetricsURL)
+		}
+		output, err := dockerClient.ExecCommand(cfg.CrowdsecContainerName, cmd)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, models.Response{
 				Success: false,

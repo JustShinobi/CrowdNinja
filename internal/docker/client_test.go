@@ -99,4 +99,32 @@ func TestCloudNativeRuntimeModeAndOperations(t *testing.T) {
 	if err != nil || !running {
 		t.Fatalf("IsContainerRunning failed: running=%v err=%v", running, err)
 	}
+
+	// Test kill SIGHUP 1 interception (CRIT-03 guard)
+	if _, err := c.ExecCommand("crowdsec", []string{"kill", "-SIGHUP", "1"}); err != nil {
+		t.Fatalf("expected kill SIGHUP 1 to be safely intercepted, got: %v", err)
+	}
+
+	// Test nil-safe image & exec methods in Cloud-Native mode (CRIT-01 guard)
+	if err := c.ValidateImageTag("crowdsecurity/crowdsec", "latest"); err != nil {
+		t.Fatalf("ValidateImageTag failed: %v", err)
+	}
+	if _, err := c.GetLocalImageDigest("crowdsecurity/crowdsec", "latest"); err != nil {
+		t.Fatalf("GetLocalImageDigest failed: %v", err)
+	}
+	if _, err := ExecInteractive(c, "crowdsec", []string{"/bin/sh"}, nil); err == nil {
+		t.Fatalf("expected ExecInteractive to return error in Cloud-Native mode")
+	}
+
+	// Test Docker multiplexed framing in wrapDockerMultiplexedStream (CRIT-04 guard)
+	stream := wrapDockerMultiplexedStream("2026-10-26T12:00:00Z info test log\n")
+	defer stream.Close()
+	hdr := make([]byte, 8)
+	if _, err := stream.Read(hdr); err != nil {
+		t.Fatalf("stream.Read header failed: %v", err)
+	}
+	frameLen := int(hdr[4])<<24 | int(hdr[5])<<16 | int(hdr[6])<<8 | int(hdr[7])
+	if hdr[0] != 1 || frameLen != 35 {
+		t.Fatalf("unexpected Docker frame header: type=%d len=%d", hdr[0], frameLen)
+	}
 }

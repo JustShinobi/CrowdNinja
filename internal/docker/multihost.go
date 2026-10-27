@@ -77,7 +77,7 @@ func NewMultiHostClient(hostsConfig string) (*MultiHostClient, error) {
 			return nil, fmt.Errorf("failed to create docker client for host %q (%s): %w", hostID, endpoint, err)
 		}
 
-		mhc.clients[hostID] = &Client{cli: cli, ctx: context.Background()}
+		mhc.clients[hostID] = &Client{cli: cli, ctx: context.Background(), mode: "docker"}
 		mhc.hosts = append(mhc.hosts, HostInfo{ID: hostID, Endpoint: endpoint, IsLocal: isLocal})
 
 		if i == 0 {

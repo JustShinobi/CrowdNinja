@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+var validASNPattern = regexp.MustCompile(`^AS\d{1,10}$`)
 
 // ListASNRules returns all persistent ASN response rules.
 func ListASNRules(db *database.Database) gin.HandlerFunc {
@@ -50,13 +53,36 @@ func UpsertASNRule(db *database.Database) gin.HandlerFunc {
 			return
 		}
 		req.ASN = normalizeASN(req.ASN)
-		if req.ASN == "" {
+		if !validASNPattern.MatchString(req.ASN) {
 			c.JSON(http.StatusBadRequest, models.Response{
 				Success: false,
-				Error:   "ASN is required (e.g. AS14061 or 14061)",
+				Error:   "Valid ASN is required (e.g. AS14061 or 14061)",
 			})
 			return
 		}
+		if req.Action == "" {
+			req.Action = "ban"
+		}
+		if req.Action != "ban" && req.Action != "captcha" {
+			c.JSON(http.StatusBadRequest, models.Response{
+				Success: false,
+				Error:   "Invalid action: must be 'ban' or 'captcha'",
+			})
+			return
+		}
+		if req.Duration == "" {
+			req.Duration = "168h"
+		}
+		normDur, ok := NormalizeDuration(req.Duration)
+		if !ok || normDur == "" {
+			c.JSON(http.StatusBadRequest, models.Response{
+				Success: false,
+				Error:   "Invalid duration format: " + req.Duration,
+			})
+			return
+		}
+		req.Duration = normDur
+
 		if err := db.UpsertASNRule(&req); err != nil {
 			c.JSON(http.StatusInternalServerError, models.Response{
 				Success: false,
@@ -76,10 +102,10 @@ func UpsertASNRule(db *database.Database) gin.HandlerFunc {
 func DeleteASNRule(db *database.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		asn := normalizeASN(c.Param("asn"))
-		if asn == "" {
+		if !validASNPattern.MatchString(asn) {
 			c.JSON(http.StatusBadRequest, models.Response{
 				Success: false,
-				Error:   "ASN parameter is required",
+				Error:   "Valid ASN parameter is required",
 			})
 			return
 		}
@@ -128,10 +154,11 @@ func AddASNException(db *database.Database) gin.HandlerFunc {
 			return
 		}
 		req.ASN = normalizeASN(req.ASN)
-		if req.ASN == "" || strings.TrimSpace(req.IPOrCIDR) == "" {
+		req.IPOrCIDR = strings.TrimSpace(req.IPOrCIDR)
+		if !validASNPattern.MatchString(req.ASN) || !isValidIPOrCIDR(req.IPOrCIDR) {
 			c.JSON(http.StatusBadRequest, models.Response{
 				Success: false,
-				Error:   "Both asn and ip_or_cidr are required",
+				Error:   "Valid asn and ip_or_cidr (IP or CIDR) are required",
 			})
 			return
 		}
@@ -196,10 +223,10 @@ func EvaluateASNEvent(db *database.Database, dockerClient *docker.Client, cfg *c
 		}
 		asn := normalizeASN(req.ASN)
 		ip := strings.TrimSpace(req.IP)
-		if asn == "" || ip == "" {
+		if !validASNPattern.MatchString(asn) || net.ParseIP(ip) == nil {
 			c.JSON(http.StatusBadRequest, models.Response{
 				Success: false,
-				Error:   "Both ip and asn are required",
+				Error:   "Valid ip address and asn are required",
 			})
 			return
 		}
@@ -229,7 +256,14 @@ func EvaluateASNEvent(db *database.Database, dockerClient *docker.Client, cfg *c
 			return
 		}
 
-		exceptions, _ := db.ListASNExceptions(asn)
+		exceptions, err := db.ListASNExceptions(asn)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.Response{
+				Success: false,
+				Error:   "Failed to load ASN exceptions: " + err.Error(),
+			})
+			return
+		}
 		if isIPExcepted(ip, exceptions) {
 			c.JSON(http.StatusOK, models.Response{
 				Success: true,
@@ -248,11 +282,20 @@ func EvaluateASNEvent(db *database.Database, dockerClient *docker.Client, cfg *c
 			return
 		}
 
+		normDur, ok := NormalizeDuration(matchedRule.Duration)
+		if !ok || normDur == "" {
+			normDur = "168h"
+		}
+		action := matchedRule.Action
+		if action != "ban" && action != "captcha" {
+			action = "ban"
+		}
+
 		cmd := []string{
 			"cscli", "decisions", "add",
 			"--ip", ip,
-			"--duration", matchedRule.Duration,
-			"--type", matchedRule.Action,
+			"--duration", normDur,
+			"--type", action,
 			"--reason", fmt.Sprintf("%s (%s)", matchedRule.Reason, asn),
 		}
 		output, err := dockerClient.ExecCommand(cfg.CrowdsecContainerName, cmd)
@@ -287,12 +330,15 @@ func normalizeASN(asn string) string {
 
 func isIPExcepted(ipStr string, exceptions []database.ASNException) bool {
 	parsedIP := net.ParseIP(strings.TrimSpace(ipStr))
+	if parsedIP == nil {
+		return false
+	}
 	for _, exc := range exceptions {
 		candidate := strings.TrimSpace(exc.IPOrCIDR)
-		if candidate == ipStr {
+		if candIP := net.ParseIP(candidate); candIP != nil && candIP.Equal(parsedIP) {
 			return true
 		}
-		if parsedIP != nil && strings.Contains(candidate, "/") {
+		if strings.Contains(candidate, "/") {
 			if _, ipNet, err := net.ParseCIDR(candidate); err == nil && ipNet.Contains(parsedIP) {
 				return true
 			}
@@ -310,7 +356,6 @@ func MatchStructuredQuery(query string, fields map[string]string) bool {
 		return true
 	}
 
-	// Split by top-level OR groups first
 	orGroups := splitByOperator(q, "OR")
 	for _, group := range orGroups {
 		if matchAndGroup(group, fields) {
@@ -323,6 +368,7 @@ func MatchStructuredQuery(query string, fields map[string]string) bool {
 func matchAndGroup(group string, fields map[string]string) bool {
 	tokens := tokenizeSearch(group)
 	negateNext := false
+	evaluatedTerms := 0
 
 	for _, tok := range tokens {
 		upper := strings.ToUpper(tok)
@@ -334,6 +380,7 @@ func matchAndGroup(group string, fields map[string]string) bool {
 			continue
 		}
 
+		evaluatedTerms++
 		negated := negateNext
 		negateNext = false
 
@@ -350,18 +397,17 @@ func matchAndGroup(group string, fields map[string]string) bool {
 			return false
 		}
 	}
-	return true
+	return evaluatedTerms > 0 || !negateNext
 }
 
 func matchSingleTerm(term string, fields map[string]string) bool {
 	term = strings.Trim(term, `"`)
 	if idx := strings.Index(term, ":"); idx > 0 {
 		key := strings.ToLower(strings.TrimSpace(term[:idx]))
-		val := strings.ToLower(strings.Trim(strings.TrimSpace(term[idx+1:]), `"`))
 		if actual, ok := fields[key]; ok {
+			val := strings.ToLower(strings.Trim(strings.TrimSpace(term[idx+1:]), `"`))
 			return strings.Contains(strings.ToLower(actual), val)
 		}
-		return false
 	}
 
 	needle := strings.ToLower(term)
@@ -423,8 +469,10 @@ func tokenizeSearch(s string) []string {
 	return tokens
 }
 
+var allowedPromQLSelectorRe = regexp.MustCompile(`\bcs_[a-zA-Z0-9_]+\b`)
+
 // QueryPromQLMetrics proxies or aggregates runtime CrowdSec metrics from Prometheus / VictoriaMetrics
-// (ported from crowdsec-web-ui runtime metrics module).
+// (ported from crowdsec-web-ui runtime metrics module). Restricted to CrowdSec (cs_*) metrics.
 func QueryPromQLMetrics(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		promURL := strings.TrimSpace(cfg.PrometheusURL)
@@ -440,11 +488,25 @@ func QueryPromQLMetrics(cfg *config.Config) gin.HandlerFunc {
 		query := strings.TrimSpace(c.Query("query"))
 		if query == "" {
 			query = `{__name__=~"cs_.*"}`
+		} else if !allowedPromQLSelectorRe.MatchString(query) && query != `{__name__=~"cs_.*"}` {
+			c.JSON(http.StatusBadRequest, models.Response{
+				Success: false,
+				Error:   "Only CrowdSec metrics (cs_*) may be queried via this endpoint",
+			})
+			return
 		}
 
 		endpoint := strings.TrimRight(promURL, "/") + "/api/v1/query?query=" + url.QueryEscape(query)
+		req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, endpoint, nil)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, models.Response{
+				Success: false,
+				Error:   "Invalid PromQL request: " + err.Error(),
+			})
+			return
+		}
 		httpClient := &http.Client{Timeout: 8 * time.Second}
-		resp, err := httpClient.Get(endpoint)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			c.JSON(http.StatusBadGateway, models.Response{
 				Success: false,

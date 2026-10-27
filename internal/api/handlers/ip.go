@@ -117,6 +117,7 @@ func IsIPBlocked(dockerClient *docker.Client, cfg *config.Config) gin.HandlerFun
 				"ip":      ip,
 				"blocked": blocked,
 				"reason":  reason,
+				"details": reason,
 			},
 		})
 	}

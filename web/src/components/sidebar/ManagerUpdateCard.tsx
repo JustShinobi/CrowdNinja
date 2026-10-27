@@ -25,7 +25,7 @@ export function ManagerUpdateCard({ collapsed = false }: ManagerUpdateCardProps)
         <span>Update Available</span>
       </div>
       <p className="mt-1 text-xs text-muted-foreground leading-snug">
-        Version {latestVersion} of CrowdSec Manager is ready to install
+        Version {latestVersion} of CrowdNinja is ready to install
       </p>
       {releaseUrl && (
         <a

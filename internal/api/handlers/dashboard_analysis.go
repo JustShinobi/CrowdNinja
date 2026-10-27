@@ -253,6 +253,22 @@ func getAlertsAnalysisWithExecutor(input alertAnalysisHandlerInput) gin.HandlerF
 		}
 
 		logger.Info("Alerts analysis retrieved successfully", "count", len(alerts))
+
+		if q := strings.TrimSpace(c.Query("q")); q != "" {
+			filtered := make([]interface{}, 0, len(alerts))
+			for _, item := range alerts {
+				node, ok := item.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				fields := extractAlertSearchFields(node)
+				if MatchStructuredQuery(q, fields) {
+					filtered = append(filtered, item)
+				}
+			}
+			alerts = filtered
+		}
+
 		writeAlertsAnalysisResult(alertAnalysisResultInput{
 			Context:         c,
 			Cache:           input.Cache,
@@ -330,6 +346,36 @@ func parseAlertsAnalysisOutput(output string) ([]interface{}, error) {
 
 	normalizeAlertsAnalysis(alerts)
 	return alerts, nil
+}
+
+func extractAlertSearchFields(node map[string]interface{}) map[string]string {
+	fields := map[string]string{
+		"id":       fmt.Sprintf("%v", node["id"]),
+		"scenario": fmt.Sprintf("%v", node["scenario"]),
+		"message":  fmt.Sprintf("%v", node["message"]),
+		"ip":       fmt.Sprintf("%v", node["value"]),
+		"value":    fmt.Sprintf("%v", node["value"]),
+		"scope":    fmt.Sprintf("%v", node["scope"]),
+		"origin":   fmt.Sprintf("%v", node["origin"]),
+		"type":     fmt.Sprintf("%v", node["type"]),
+		"country":  "",
+		"asn":      "",
+	}
+	if src, ok := node["source"].(map[string]interface{}); ok {
+		if ip, ok := src["ip"].(string); ok && ip != "" {
+			fields["ip"] = ip
+		}
+		if cn, ok := src["cn"].(string); ok {
+			fields["country"] = cn
+		}
+		if asNum, ok := src["as_number"].(string); ok {
+			fields["asn"] = normalizeASN(asNum)
+		}
+		if asName, ok := src["as_name"].(string); ok {
+			fields["as_name"] = asName
+		}
+	}
+	return fields
 }
 
 func normalizeAlertsAnalysis(alerts []interface{}) {

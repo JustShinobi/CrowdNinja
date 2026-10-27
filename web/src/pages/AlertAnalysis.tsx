@@ -650,6 +650,7 @@ export default function AlertAnalysis() {
     setIsDeleting(true)
     try {
       await crowdsecAPI.deleteAlert(deleteAlertId)
+      lastNonEmptyAlertsRef.current = null
       toast.success(`Alert #${deleteAlertId} deleted`)
       setDeleteAlertId(null)
       // Close the detail modal if this alert was being inspected

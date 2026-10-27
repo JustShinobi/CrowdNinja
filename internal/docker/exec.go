@@ -18,6 +18,9 @@ type ExecSession struct {
 // ExecInteractive creates a TTY exec session inside a container.
 // Returns an ExecSession with Read/Write/Close for bidirectional IO.
 func ExecInteractive(c *Client, containerName string, cmd []string, env []string) (*ExecSession, error) {
+	if c == nil || c.isCloudNative() {
+		return nil, fmt.Errorf("interactive container terminal is disabled in cloud-native (%s) mode", c.RuntimeMode())
+	}
 	containerID, err := c.GetContainerID(containerName)
 	if err != nil {
 		return nil, fmt.Errorf("container not found: %w", err)
@@ -68,6 +71,9 @@ func (s *ExecSession) Close() error {
 
 // Resize resizes the TTY of the exec session
 func (s *ExecSession) Resize(cols, rows uint) error {
+	if s.client == nil || s.client.isCloudNative() || s.client.cli == nil {
+		return nil
+	}
 	return s.client.cli.ContainerExecResize(s.client.ctx, s.execID, container.ResizeOptions{
 		Width:  cols,
 		Height: rows,

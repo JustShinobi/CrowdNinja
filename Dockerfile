@@ -1,20 +1,17 @@
-# Multi-stage Dockerfile for CrowdSec Manager
+# Multi-stage Dockerfile for CrowdNinja (Cloud-Native CrowdSec Security Operations)
+
+# Stage 0: Official CrowdSec CLI & default config templates
+FROM docker.io/crowdsecurity/crowdsec:v1.8.1 AS crowdsec-cli
 
 # Stage 1: Build frontend
 FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/web
 
-# Copy package files
 COPY web/package*.json ./
-
-# Install dependencies
 RUN npm ci --legacy-peer-deps
 
-# Copy frontend source
 COPY web/ ./
-
-# Build frontend
 RUN npm run build
 
 # Stage 2: Build Go backend
@@ -22,50 +19,41 @@ FROM golang:1.23-alpine AS backend-builder
 
 WORKDIR /app
 
-# Install build dependencies (CGO required for go-sqlite3)
 RUN apk add --no-cache git gcc musl-dev sqlite-dev
 
-# Copy go mod files
 COPY go.mod go.sum ./
-
-# Download dependencies
 RUN go mod download
 
-# Copy source code
 COPY cmd/ cmd/
 COPY internal/ internal/
 
-# Build binary (CGO_ENABLED=1 required for go-sqlite3)
 RUN CGO_ENABLED=1 GOOS=linux go build -o crowdsec-manager ./cmd/server
 
-# Stage 3: Final runtime image
+# Stage 3: Final runtime image (Alpine + embedded cscli for Cloud-Native K8s/LAPI mode)
 FROM alpine:latest
 
-# Install runtime dependencies
 RUN apk --no-cache add ca-certificates tzdata curl
 
 WORKDIR /app
 
-# Copy binary from builder
+# Copy embedded cscli and default /etc/crowdsec templates for Cloud-Native mode
+COPY --from=crowdsec-cli /usr/local/bin/cscli /usr/local/bin/cscli
+COPY --from=crowdsec-cli /etc/crowdsec /etc/crowdsec
+
+# Copy CrowdNinja backend binary, entrypoint, and frontend assets
 COPY --from=backend-builder /app/crowdsec-manager .
-
-# Copy frontend build from frontend-builder
 COPY --from=frontend-builder /app/web/dist ./web/dist
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 
-# Create necessary directories. /app/geoip is the default mount point for
-# an optional GeoLite2-City.mmdb (set GEOIP_DB_PATH to override). When the
-# file is absent the dashboard endpoints still respond — country and
-# coordinates are simply omitted.
-RUN mkdir -p /app/backups /app/logs /app/config /app/data /app/geoip
+RUN chmod +x /app/docker-entrypoint.sh /app/crowdsec-manager && \
+    mkdir -p /app/backups /app/logs /app/config /app/data /app/geoip \
+             /var/lib/crowdsec/data /etc/crowdsec/hub /etc/crowdsec/parsers/s02-enrich \
+             /etc/crowdsec/scenarios /etc/crowdsec/postoverflows /etc/crowdsec/notifications
 
-# Expose port
 EXPOSE 8080
 
-# Health check (uses PORT env var, defaults to 8080)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
-# Run as root user (no USER directive)
-# This allows write access to mounted volumes
-
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["./crowdsec-manager"]

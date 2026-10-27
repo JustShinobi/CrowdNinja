@@ -35,6 +35,7 @@ func TestMatchStructuredQuery(t *testing.T) {
 		{"country:US OR country:CN", true},
 		{"country:US OR country:DE", false},
 		{`scenario:"http-probing" AND asn:AS4134`, true},
+		{"2001:db8::1", false},
 	}
 
 	for _, tc := range tests {

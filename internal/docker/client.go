@@ -277,7 +277,7 @@ func (c *Client) FollowContainerLogs(containerName, since string) (io.ReadCloser
 		if err != nil {
 			return nil, err
 		}
-		return io.NopCloser(strings.NewReader(logs)), nil
+		return wrapDockerMultiplexedStream(logs), nil
 	}
 	containerID, err := c.GetContainerID(containerName)
 	if err != nil {
@@ -616,6 +616,9 @@ func (c *Client) GetHostMountPath(containerName, containerPath string) (string, 
 // ValidateImageTag verifies that an image:tag exists locally or in the registry
 // Checks local cache first, then queries registry without pulling
 func (c *Client) ValidateImageTag(imageName, tag string) error {
+	if c.isCloudNative() {
+		return nil
+	}
 	// Construct full image reference
 	fullImage := imageName + ":" + tag
 
@@ -640,6 +643,9 @@ func (c *Client) ValidateImageTag(imageName, tag string) error {
 // PullImage downloads a Docker image from the registry
 // Blocks until pull completes or fails
 func (c *Client) PullImage(imageName, tag string) error {
+	if c.isCloudNative() {
+		return fmt.Errorf("container image pull is managed by Kubernetes/GitOps in %s mode", c.RuntimeMode())
+	}
 	fullImage := imageName + ":" + tag
 
 	reader, err := c.cli.ImagePull(c.ctx, fullImage, image.PullOptions{})
@@ -659,6 +665,9 @@ func (c *Client) PullImage(imageName, tag string) error {
 
 // RecreateContainer stops, removes, and recreates a container with a new image
 func (c *Client) RecreateContainer(name string) error {
+	if c.isCloudNative() {
+		return fmt.Errorf("container recreation is managed by Kubernetes/GitOps in %s mode", c.RuntimeMode())
+	}
 	containerID, err := c.GetContainerID(name)
 	if err != nil {
 		return err
@@ -712,6 +721,9 @@ func (c *Client) RecreateContainer(name string) error {
 
 // GetLocalImageDigest retrieves the digest of a local image
 func (c *Client) GetLocalImageDigest(imageName, tag string) (string, error) {
+	if c.isCloudNative() {
+		return "sha256:cloudnative", nil
+	}
 	fullImage := imageName + ":" + tag
 	inspect, _, err := c.cli.ImageInspectWithRaw(c.ctx, fullImage)
 	if err != nil {
@@ -731,6 +743,9 @@ func (c *Client) GetLocalImageDigest(imageName, tag string) (string, error) {
 
 // GetRemoteImageDigest retrieves the digest of an image from the registry
 func (c *Client) GetRemoteImageDigest(imageName, tag string) (string, error) {
+	if c.isCloudNative() {
+		return "sha256:cloudnative", nil
+	}
 	fullImage := imageName + ":" + tag
 	distributionInspect, err := c.cli.DistributionInspect(c.ctx, fullImage, "")
 	if err != nil {

@@ -71,6 +71,20 @@ export default function IPManagement() {
       toast.success('ASN rule removed')
       queryClient.invalidateQueries({ queryKey: ['asnRules'] })
     },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, 'Failed to remove ASN rule', ErrorContexts.IPUnban))
+    },
+  })
+
+  const deleteASNExceptionMutation = useMutation({
+    mutationFn: (id: number) => api.ip.deleteASNException(id),
+    onSuccess: () => {
+      toast.success('ASN exception removed')
+      queryClient.invalidateQueries({ queryKey: ['asnExceptions'] })
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, 'Failed to remove ASN exception', ErrorContexts.IPUnban))
+    },
   })
 
   const addASNExceptionMutation = useMutation({
@@ -509,6 +523,15 @@ export default function IPManagement() {
                         <p className="font-mono font-semibold">{exc.asn} → {exc.ip_or_cidr}</p>
                         {exc.note && <p className="text-xs text-muted-foreground">{exc.note}</p>}
                       </div>
+                      {exc.id != null && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteASNExceptionMutation.mutate(exc.id!)}
+                        >
+                          Remove
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -525,6 +548,7 @@ export default function IPManagement() {
           { label: 'Block Status', text: 'Check if an IP is currently blocked by CrowdSec or Traefik.' },
           { label: 'Security Check', text: 'Get comprehensive security information including whitelist status and presence in both CrowdSec and Traefik systems.' },
           { label: 'Unban', text: 'Remove an IP from all blocklists. Use this carefully as it will immediately allow traffic from that IP address.' },
+          { label: 'Persistent ASN Response', text: 'Automatically ban newly observed IPs belonging to hostile Autonomous Systems, with Dry-Run simulation and IP/CIDR exception support.' },
         ]}
       />
     </div>
