@@ -19,6 +19,78 @@ export default function IPManagement() {
   const [securityCheckIP, setSecurityCheckIP] = useState('')
   const [blockedCheckResult, setBlockedCheckResult] = useState<any>(null)
   const [securityCheckResult, setSecurityCheckResult] = useState<any>(null)
+  const [newASN, setNewASN] = useState('')
+  const [newASName, setNewASName] = useState('')
+  const [newASNDuration, setNewASNDuration] = useState('168h')
+  const [newASNDryRun, setNewASNDryRun] = useState(false)
+  const [excASN, setExcASN] = useState('')
+  const [excCIDR, setExcCIDR] = useState('')
+  const [excNote, setExcNote] = useState('')
+
+  const { data: asnRules = [] } = useQuery({
+    queryKey: ['asnRules'],
+    queryFn: async () => {
+      const response = await api.ip.listASNRules()
+      return response.data.data ?? []
+    },
+  })
+
+  const { data: asnExceptions = [] } = useQuery({
+    queryKey: ['asnExceptions'],
+    queryFn: async () => {
+      const response = await api.ip.listASNExceptions()
+      return response.data.data ?? []
+    },
+  })
+
+  const saveASNRuleMutation = useMutation({
+    mutationFn: () =>
+      api.ip.saveASNRule({
+        asn: newASN,
+        as_name: newASName,
+        action: 'ban',
+        duration: newASNDuration || '168h',
+        reason: 'crowdninja/persistent-asn-ban',
+        dry_run: newASNDryRun,
+        enabled: true,
+      }),
+    onSuccess: () => {
+      toast.success('Persistent ASN rule saved')
+      setNewASN('')
+      setNewASName('')
+      queryClient.invalidateQueries({ queryKey: ['asnRules'] })
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, 'Failed to save ASN rule', ErrorContexts.IPUnban))
+    },
+  })
+
+  const deleteASNRuleMutation = useMutation({
+    mutationFn: (asn: string) => api.ip.deleteASNRule(asn),
+    onSuccess: () => {
+      toast.success('ASN rule removed')
+      queryClient.invalidateQueries({ queryKey: ['asnRules'] })
+    },
+  })
+
+  const addASNExceptionMutation = useMutation({
+    mutationFn: () =>
+      api.ip.addASNException({
+        asn: excASN,
+        ip_or_cidr: excCIDR,
+        note: excNote,
+      }),
+    onSuccess: () => {
+      toast.success('ASN IP/CIDR exception added')
+      setExcASN('')
+      setExcCIDR('')
+      setExcNote('')
+      queryClient.invalidateQueries({ queryKey: ['asnExceptions'] })
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, 'Failed to add ASN exception', ErrorContexts.IPUnban))
+    },
+  })
 
   const { data: publicIPData, isLoading: publicIPLoading } = useQuery({
     queryKey: ['publicIP'],
@@ -121,10 +193,11 @@ export default function IPManagement() {
 
       {/* IP Operations */}
       <Tabs defaultValue="check" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="check">Check Blocked</TabsTrigger>
           <TabsTrigger value="security">Security Check</TabsTrigger>
           <TabsTrigger value="unban">Unban IP</TabsTrigger>
+          <TabsTrigger value="asn">Persistent ASN Response</TabsTrigger>
         </TabsList>
 
         {/* Check if IP is Blocked */}
@@ -329,6 +402,119 @@ export default function IPManagement() {
               </form>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Persistent ASN Response */}
+        <TabsContent value="asn">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Persistent ASN Ban Rules</CardTitle>
+                <CardDescription>
+                  Automatically ban newly observed IPs from a hostile Autonomous System (with Dry-Run support)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3">
+                  <Input
+                    placeholder="ASN (e.g. AS14061 or 14061)"
+                    value={newASN}
+                    onChange={(e) => setNewASN(e.target.value)}
+                  />
+                  <Input
+                    placeholder="AS Organization Name (optional)"
+                    value={newASName}
+                    onChange={(e) => setNewASName(e.target.value)}
+                  />
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      placeholder="Duration (default 168h)"
+                      value={newASNDuration}
+                      onChange={(e) => setNewASNDuration(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      variant={newASNDryRun ? 'secondary' : 'outline'}
+                      onClick={() => setNewASNDryRun(!newASNDryRun)}
+                    >
+                      {newASNDryRun ? 'Mode: Dry-Run' : 'Mode: Enforce'}
+                    </Button>
+                  </div>
+                  <Button
+                    type="button"
+                    disabled={!newASN.trim() || saveASNRuleMutation.isPending}
+                    onClick={() => saveASNRuleMutation.mutate()}
+                  >
+                    Save Persistent ASN Rule
+                  </Button>
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  {asnRules.map((rule) => (
+                    <div key={rule.asn} className="flex items-center justify-between p-3 border rounded-lg text-sm">
+                      <div>
+                        <p className="font-mono font-semibold">{rule.asn} {rule.as_name ? `— ${rule.as_name}` : ''}</p>
+                        <p className="text-xs text-muted-foreground">Duration: {rule.duration} • {rule.dry_run ? 'Dry-Run Simulation' : 'Live Enforcement'}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteASNRuleMutation.mutate(rule.asn)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>ASN IP / CIDR Exceptions</CardTitle>
+                <CardDescription>
+                  Exclude specific IPs or CIDR subnets from persistent ASN bans
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3">
+                  <Input
+                    placeholder="ASN (e.g. AS14061)"
+                    value={excASN}
+                    onChange={(e) => setExcASN(e.target.value)}
+                  />
+                  <Input
+                    placeholder="IP or CIDR (e.g. 198.51.100.0/24)"
+                    value={excCIDR}
+                    onChange={(e) => setExcCIDR(e.target.value)}
+                  />
+                  <Input
+                    placeholder="Exception note (optional)"
+                    value={excNote}
+                    onChange={(e) => setExcNote(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    disabled={!excASN.trim() || !excCIDR.trim() || addASNExceptionMutation.isPending}
+                    onClick={() => addASNExceptionMutation.mutate()}
+                  >
+                    Add Exception
+                  </Button>
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  {asnExceptions.map((exc) => (
+                    <div key={`${exc.asn}-${exc.ip_or_cidr}`} className="flex items-center justify-between p-3 border rounded-lg text-sm">
+                      <div>
+                        <p className="font-mono font-semibold">{exc.asn} → {exc.ip_or_cidr}</p>
+                        {exc.note && <p className="text-xs text-muted-foreground">{exc.note}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 
