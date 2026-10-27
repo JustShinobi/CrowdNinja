@@ -14,7 +14,11 @@ export function formatBytes(bytes: number): string {
 }
 
 export function formatDate(date: string | Date): string {
-  return new Date(date).toLocaleString()
+  if (!date) return 'Never'
+  if (typeof date === 'string' && date.startsWith('0001-01-01')) return 'Never'
+  const d = new Date(date)
+  if (isNaN(d.getTime()) || d.getUTCFullYear() <= 1) return 'Never'
+  return d.toLocaleString()
 }
 
 export function parseUserAgent(ua: string) {

@@ -37,6 +37,7 @@ import { Plus, Trash2, RefreshCw, Copy, Check, Shield, AlertCircle } from 'lucid
 import { toast } from 'sonner'
 import { EmptyState, PageHeader, QueryError, ResultsSummary } from '@/components/common'
 import { useUrlFilters } from '@/hooks'
+import { formatDate } from '@/lib/utils'
 
 /**
  * Type guard to check if an object is a valid Bouncer.
@@ -347,7 +348,7 @@ export default function Bouncers() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {bouncer.last_pull ? new Date(bouncer.last_pull).toLocaleString() : '-'}
+                        {formatDate(bouncer.last_pull)}
                       </TableCell>
                       <TableCell>{getStatusBadge(bouncer.status || (bouncer.valid ? 'stale' : 'disconnected'))}</TableCell>
                       <TableCell className="text-right">
