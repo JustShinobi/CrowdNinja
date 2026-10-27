@@ -1,5 +1,5 @@
 # =============================================================================
-# Persistent Volume Claims for CrowdSec Manager
+# Persistent Volume Claims for CrowdNinja
 # =============================================================================
 # All PVCs use ReadWriteOnce — only one Pod (on one node) can mount them at
 # a time.  This is intentional: the Deployment uses strategy.type: Recreate,

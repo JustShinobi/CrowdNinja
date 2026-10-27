@@ -1,4 +1,4 @@
-CrowdSec Manager has been deployed!
+CrowdNinja has been deployed!
 
 === Access ===
 

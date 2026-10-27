@@ -107,10 +107,10 @@ spec:
               memory: 128Mi
 
         # =======================================================================
-        # Container 2: CrowdSec Manager (main application)
+        # Container 2: CrowdNinja (main application)
         # =======================================================================
         - name: crowdsec-manager
-          image: hhftechnology/crowdsec-manager:latest
+          image: ghcr.io/justshinobi/crowdninja:latest
           imagePullPolicy: Always
           ports:
             - name: http

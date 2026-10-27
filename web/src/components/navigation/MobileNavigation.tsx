@@ -39,7 +39,7 @@ function MobileNavigation({ className }: MobileNavigationProps) {
           <div className="flex items-center justify-between border-b p-4">
             <div className="flex items-center gap-2 font-semibold">
               <Shield className="h-5 w-5 text-primary" />
-              <span>CrowdSec Manager</span>
+              <span>CrowdNinja</span>
             </div>
             <Button
               variant="ghost"

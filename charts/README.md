@@ -1,6 +1,6 @@
-# CrowdSec Manager — Helm Chart
+# CrowdNinja — Helm Chart
 
-Deploy CrowdSec Manager on Kubernetes with a **Tailscale sidecar** for VPN-only access using Helm.
+Deploy CrowdNinja on Kubernetes with a **Tailscale sidecar** for VPN-only access using Helm.
 
 For plain `kubectl` manifests (no Helm), see [`../k8s/`](../k8s/).
 

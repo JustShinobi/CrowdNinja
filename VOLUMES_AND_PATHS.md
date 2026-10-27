@@ -1,6 +1,6 @@
 # Volumes and Paths Guide
 
-This document explains the directory structure, volume mappings, and file locations for the CrowdSec Manager stack.
+This document explains the directory structure, volume mappings, and file locations for the CrowdNinja stack.
 
 ## Directory Structure
 
@@ -13,7 +13,7 @@ project-root/
 ├── backups/                # Stores system backups
 ├── data/                   # Application database (settings.db)
 ├── logs/                   # Centralized logs
-│   ├── app/                # CrowdSec Manager logs
+│   ├── app/                # CrowdNinja logs
 │   └── traefik/            # Traefik access and error logs
 └── config/                 # Configuration files
     ├── crowdsec/           # CrowdSec configuration
@@ -29,7 +29,7 @@ project-root/
 
 In your `docker-compose.yml`, use these mapped volumes. We use **relative paths** (`./`) to keep things portable.
 
-### CrowdSec Manager Service
+### CrowdNinja Service
 
 ```yaml
 volumes:

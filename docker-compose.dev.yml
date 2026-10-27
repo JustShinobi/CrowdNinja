@@ -4,7 +4,7 @@ version: '3.8'
 # Usage: docker-compose -f docker-compose.dev.yml up
 
 services:
-  # CrowdSec Manager - Development mode with hot reload
+  # CrowdNinja - Development mode with hot reload
   crowdsec-manager-dev:
     build:
       context: .

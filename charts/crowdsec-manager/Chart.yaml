@@ -1,8 +1,8 @@
 apiVersion: v2
 name: crowdsec-manager
-description: CrowdSec Manager — Go+React security management UI with Tailscale sidecar for VPN-only access
+description: CrowdNinja — Go+React security management UI with Tailscale sidecar for VPN-only access
 type: application
-version: 0.1.0
+version: 1.0.0
 appVersion: "latest"
 keywords:
   - crowdsec
@@ -10,8 +10,8 @@ keywords:
   - security
   - traefik
   - wireguard
-home: https://github.com/hhftechnology/crowdsec_manager
+home: https://github.com/JustShinobi/CrowdNinja
 sources:
-  - https://github.com/hhftechnology/crowdsec_manager
+  - https://github.com/JustShinobi/CrowdNinja
 maintainers:
-  - name: hhftechnology
+  - name: JustShinobi

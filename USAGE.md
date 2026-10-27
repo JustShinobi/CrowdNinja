@@ -1,8 +1,8 @@
-# CrowdSec Manager - Usage Guide
+# CrowdNinja - Usage Guide
 
 > ⚠️ **BETA SOFTWARE** - Test thoroughly before production use
 
-This guide provides detailed usage instructions, examples, and best practices for CrowdSec Manager.
+This guide provides detailed usage instructions, examples, and best practices for CrowdNinja.
 
 ## Table of Contents
 

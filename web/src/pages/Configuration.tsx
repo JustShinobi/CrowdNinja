@@ -135,7 +135,7 @@ export default function Configuration() {
           </div>
           <div className="pt-2">
             <p className="text-xs text-muted-foreground">
-              If your Traefik configuration uses a different path or filename, update it here to ensure proper integration with CrowdSec Manager.
+              If your Traefik configuration uses a different path or filename, update it here to ensure proper integration with CrowdNinja.
             </p>
           </div>
         </CardContent>

@@ -182,13 +182,6 @@ services:
 
 ---
 
-## 🙏 Acknowledgments & Lineage
-
-CrowdNinja stands on the shoulders of three great open-source projects in the CrowdSec ecosystem:
-* [**hhftechnology/crowdsec_manager**](https://github.com/hhftechnology/crowdsec_manager) — Go + React ShadcnUI foundation, Hub Browser, Bouncer/Allowlist/Profile management.
-* [**TheDuffman85/crowdsec-web-ui**](https://github.com/TheDuffman85/crowdsec-web-ui) — Inspiration for boolean structured search, durable deletion tombstones, and Prometheus runtime metrics.
-* [**OpenSecDash**](https://opensecdash.app/) — Inspiration for persistent ASN response policies, CIDR exceptions, dry-run simulation, and log correlation workflows.
-
 ## 📄 License
 
 Released under the [MIT License](LICENSE).

@@ -29,7 +29,7 @@ on:
       - main
 
 env:
-  IMAGE_NAME: crowdsec-manager
+  IMAGE_NAME: crowdninja
 
 jobs:
   build-and-push:
@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           make contracts
-          git diff --exit-code -- web/src/lib/api/contracts.generated.ts mobile/src/lib/api/contracts.generated.ts
+          git diff --exit-code -- web/src/lib/api/contracts.generated.ts
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

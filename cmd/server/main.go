@@ -33,7 +33,7 @@ import (
 	"crowdsec-manager/internal/messaging"
 )
 
-// Main entry point for the CrowdSec Manager server
+// Main entry point for the CrowdNinja server
 // Initializes all components and starts the HTTP server with graceful shutdown
 
 func main() {

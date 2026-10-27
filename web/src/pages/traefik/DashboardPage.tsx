@@ -53,7 +53,7 @@ import { RangeSelector } from '@/features/logs/dashboard'
 import { StatCard, ChartCard, AreaTimeline, PieBreakdown, BarDistribution, ThreatMap } from '@/components/charts'
 
 // We will render sections manually in Tabs!
-// This adapts Traefik Log Dashboard UI into CrowdSec Manager.
+// This adapts Traefik Log Dashboard UI into CrowdNinja.
 
 function formatNumber(n: number): string { return n.toLocaleString() }
 function formatPercent(n: number): string { return `${(n * 100).toFixed(1)}%` }

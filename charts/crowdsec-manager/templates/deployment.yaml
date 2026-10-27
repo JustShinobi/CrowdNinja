@@ -134,7 +134,7 @@ spec:
             {{- toYaml .Values.tailscale.resources | nindent 12 }}
 
         # =====================================================================
-        # Container 2: CrowdSec Manager
+        # Container 2: CrowdNinja
         # =====================================================================
         - name: crowdsec-manager
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

@@ -1,4 +1,4 @@
-# CrowdSec Manager - React Frontend
+# CrowdNinja - React Frontend
 
 A comprehensive React/TypeScript frontend application for managing CrowdSec security infrastructure with Shadcn UI.
 

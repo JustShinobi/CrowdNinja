@@ -55,7 +55,6 @@ func main() {
 
 	for _, target := range []string{
 		"web/src/lib/api/contracts.generated.ts",
-		"mobile/src/lib/api/contracts.generated.ts",
 	} {
 		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 			fmt.Fprintf(os.Stderr, "create target dir %s: %v\n", target, err)

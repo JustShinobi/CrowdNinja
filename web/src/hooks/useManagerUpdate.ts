@@ -2,8 +2,8 @@ import { useCallback, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 const GITHUB_LATEST_RELEASE_URL =
-  'https://api.github.com/repos/hhftechnology/crowdsec_manager/releases/latest'
-const DISMISSED_STORAGE_KEY = 'csm:manager-update-dismissed'
+  'https://api.github.com/repos/JustShinobi/CrowdNinja/releases/latest'
+const DISMISSED_STORAGE_KEY = 'crowdninja:update-dismissed'
 // 6h: well under GitHub's 60 req/h unauthenticated quota even with multiple tabs.
 const POLL_INTERVAL_MS = 6 * 60 * 60 * 1000
 const STALE_MS = 60 * 60 * 1000

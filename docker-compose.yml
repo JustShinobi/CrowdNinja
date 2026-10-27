@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # CrowdSec Manager - Web UI and API
+  # CrowdNinja - Web UI and API
   crowdsec-manager:
     build:
       context: .

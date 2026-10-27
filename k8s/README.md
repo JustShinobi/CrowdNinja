@@ -1,6 +1,6 @@
-# CrowdSec Manager — Kubernetes Raw Manifests
+# CrowdNinja — Kubernetes Raw Manifests
 
-Deploy CrowdSec Manager on Kubernetes with a **Tailscale sidecar** for VPN-only access.
+Deploy CrowdNinja on Kubernetes with a **Tailscale sidecar** for VPN-only access.
 Access is strictly via your Tailscale network — no Ingress or NodePort is exposed.
 
 ---
@@ -157,7 +157,7 @@ Then uncomment the `docker-compose` volume and volumeMount in `deployment.yaml` 
 ```bash
 # Update the image tag (triggers Pod recreation via Recreate strategy)
 kubectl set image deployment/crowdsec-manager \
-  crowdsec-manager=hhftechnology/crowdsec-manager:v1.2.3 \
+  crowdsec-manager=ghcr.io/justshinobi/crowdninja:v1.2.3 \
   -n crowdsec
 
 # Or re-apply the whole manifest after editing

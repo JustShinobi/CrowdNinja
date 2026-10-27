@@ -1,5 +1,5 @@
 # =============================================================================
-# CrowdSec Manager — Helm Chart Values
+# CrowdNinja — Helm Chart Values
 # =============================================================================
 
 # -- Replica count. Must stay at 1: SQLite + ReadWriteOnce PVC + Docker socket
@@ -10,7 +10,7 @@ replicaCount: 1
 # Main application image
 # ---------------------------------------------------------------------------
 image:
-  repository: hhftechnology/crowdsec-manager
+  repository: ghcr.io/justshinobi/crowdninja
   tag: latest
   pullPolicy: Always
 

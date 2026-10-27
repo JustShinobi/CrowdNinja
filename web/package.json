@@ -1,7 +1,7 @@
 {
-  "name": "crowdsec-manager-ui",
-  "version": "2.4.1",
-  "description": "Web interface for Crowdsec",
+  "name": "crowdninja-ui",
+  "version": "1.0.0",
+  "description": "CrowdNinja — Cloud-Native Security Operations UI for CrowdSec",
   "type": "module",
   "scripts": {
     "dev": "vite",
