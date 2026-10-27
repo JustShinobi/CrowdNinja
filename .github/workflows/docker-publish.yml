@@ -1,27 +1,9 @@
-name: Docker Build and Push
+name: CI & Container Publish
 
 on:
   push:
     branches:
       - main
-      - dev
-    paths:
-      - 'Dockerfile'
-      - '.github/workflows/docker-publish.yml'
-      - 'web/**'
-      - 'mobile/**'
-      - 'internal/**'
-      - 'pkg/**'
-      - 'cmd/**'
-      - 'config/**'
-      - 'scripts/**'
-      - 'go.mod'
-      - 'go.sum'
-      - 'Makefile'
-      - '*.go'
-      - 'data/**'
-      - 'docs/**'
-
     tags:
       - 'v*'
   pull_request:
@@ -32,11 +14,12 @@ env:
   IMAGE_NAME: crowdninja
 
 jobs:
-  build-and-push:
+  test-and-build:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
-      contents: write
+      contents: read
       packages: write
 
     steps:
@@ -48,26 +31,22 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Verify generated contracts
-        shell: bash
-        run: |
-          make contracts
-          git diff --exit-code -- web/src/lib/api/contracts.generated.ts
+      - name: Run Go unit tests
+        run: go test ./...
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          platforms: linux/amd64,linux/arm64  # Targets your ARM64 build; add linux/amd64 if needed for others
+          node-version: '20'
+
+      - name: Build Frontend
+        working-directory: web
+        run: |
+          npm ci --legacy-peer-deps
+          npm run build
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
@@ -82,18 +61,15 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
             ghcr.io/${{ github.repository }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
+      - name: Build and push container image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -103,48 +79,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
-
-      - name: Build image for size calculation (linux/amd64)
-        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/')
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          load: true
-          tags: local/${{ env.IMAGE_NAME }}:size-${{ github.sha }}
-          cache-from: type=gha
           platforms: linux/amd64
-
-      - name: Calculate image size
-        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/')
-        id: image_size
-        shell: bash
-        run: |
-          IMAGE_REF="local/${{ env.IMAGE_NAME }}:size-${{ github.sha }}"
-          SIZE_BYTES="$(docker image inspect "${IMAGE_REF}" --format='{{.Size}}')"
-          SIZE_HUMAN="$(numfmt --to=iec --suffix=B "${SIZE_BYTES}")"
-          echo "Computed image size: ${SIZE_HUMAN}"
-          echo "size_human=${SIZE_HUMAN}" >> "${GITHUB_OUTPUT}"
-
-      - name: Update README image size
-        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/')
-        shell: bash
-        run: |
-          SIZE="${{ steps.image_size.outputs.size_human }}"
-          sed -i -E "s|(<!-- IMAGE_SIZE_START -->)[^<]*(<!-- IMAGE_SIZE_END -->)|\1${SIZE}\2|" README.md
-
-      - name: Commit README image size update
-        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/')
-        shell: bash
-        run: |
-          if git diff --quiet -- README.md; then
-            echo "README image size is already up to date"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add README.md
-          git commit -m "chore(readme): update image size [skip ci]"
-          git push
