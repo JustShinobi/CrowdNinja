@@ -72,12 +72,16 @@ fi
 
 if [ ! -f /etc/crowdsec/parsers/s02-enrich/mywhitelists.yaml ]; then
   cat > /etc/crowdsec/parsers/s02-enrich/mywhitelists.yaml <<'EOF'
-name: crowdsecurity/whitelists
+name: crowdninja/whitelists
 description: "Whitelist events from trusted IPs"
 whitelist:
   reason: "Trusted IP/CIDR managed by CrowdNinja"
-  ip: []
-  cidr: []
+  ip:
+    - "127.0.0.1"
+  cidr:
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
 EOF
 fi
 
