@@ -48,3 +48,62 @@ func ListDockerHosts(multiHost *docker.MultiHostClient) gin.HandlerFunc {
 		})
 	}
 }
+
+// RegisterLAPIInstanceRequest is the payload for registering a new CrowdSec LAPI instance at runtime.
+type RegisterLAPIInstanceRequest struct {
+	ID         string `json:"id"`
+	LAPIURL    string `json:"lapi_url"`
+	ConfigFile string `json:"config_file"`
+}
+
+// RegisterLAPIInstanceHandler dynamically registers or updates a CrowdSec LAPI instance.
+func RegisterLAPIInstanceHandler(multiHost *docker.MultiHostClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req RegisterLAPIInstanceRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, models.Response{
+				Success: false,
+				Error:   "Invalid LAPI instance payload: " + err.Error(),
+			})
+			return
+		}
+		if req.ID == "" || req.LAPIURL == "" {
+			c.JSON(http.StatusBadRequest, models.Response{
+				Success: false,
+				Error:   "Both id and lapi_url are required",
+			})
+			return
+		}
+		multiHost.RegisterLAPIInstance(req.ID, req.LAPIURL, req.ConfigFile)
+		c.JSON(http.StatusOK, models.Response{
+			Success: true,
+			Message: "LAPI instance registered",
+			Data:    req,
+		})
+	}
+}
+
+// RemoveLAPIInstanceHandler removes a dynamically registered CrowdSec LAPI instance.
+func RemoveLAPIInstanceHandler(multiHost *docker.MultiHostClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		if id == "" {
+			c.JSON(http.StatusBadRequest, models.Response{
+				Success: false,
+				Error:   "Instance ID is required",
+			})
+			return
+		}
+		if err := multiHost.RemoveLAPIInstance(id); err != nil {
+			c.JSON(http.StatusBadRequest, models.Response{
+				Success: false,
+				Error:   err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, models.Response{
+			Success: true,
+			Message: "LAPI instance removed",
+		})
+	}
+}

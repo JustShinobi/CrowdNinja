@@ -128,3 +128,35 @@ func TestCloudNativeRuntimeModeAndOperations(t *testing.T) {
 		t.Fatalf("unexpected Docker frame header: type=%d len=%d", hdr[0], frameLen)
 	}
 }
+
+func TestMultiLAPIInstancesSupport(t *testing.T) {
+	t.Setenv("LAPI_INSTANCES", "k3s-prod=http://crowdsec-service:8080|/etc/crowdsec/config.yaml,edge-dmz=http://10.20.10.10:8080|/etc/crowdsec/edge.yaml")
+
+	mhc, err := NewMultiHostClient("")
+	if err != nil {
+		t.Fatalf("NewMultiHostClient failed: %v", err)
+	}
+	defer mhc.Close()
+
+	hosts := mhc.ListHosts()
+	if len(hosts) != 2 || mhc.DefaultHostID() != "k3s-prod" {
+		t.Fatalf("unexpected LAPI instances: %+v default=%s", hosts, mhc.DefaultHostID())
+	}
+
+	mhc.RegisterLAPIInstance("branch-01", "http://10.30.0.10:8080", "/etc/crowdsec/branch.yaml")
+	if len(mhc.ListHosts()) != 3 {
+		t.Fatalf("expected 3 LAPI instances after RegisterLAPIInstance")
+	}
+
+	branchClient, err := mhc.GetClient("branch-01")
+	if err != nil || branchClient.lapiURL != "http://10.30.0.10:8080" {
+		t.Fatalf("unexpected branch-01 client: %+v err=%v", branchClient, err)
+	}
+
+	if err := mhc.RemoveLAPIInstance("branch-01"); err != nil {
+		t.Fatalf("RemoveLAPIInstance failed: %v", err)
+	}
+	if len(mhc.ListHosts()) != 2 {
+		t.Fatalf("expected 2 LAPI instances after RemoveLAPIInstance")
+	}
+}

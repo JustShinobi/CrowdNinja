@@ -95,7 +95,10 @@ func (c *Client) execLocalCommand(cmd []string) (string, error) {
 		if customBin := strings.TrimSpace(os.Getenv("CROWDSEC_CSCLI_BIN")); customBin != "" {
 			bin = customBin
 		}
-		cfgFile := strings.TrimSpace(os.Getenv("CROWDSEC_CONFIG_FILE"))
+		cfgFile := strings.TrimSpace(c.configFile)
+		if cfgFile == "" {
+			cfgFile = strings.TrimSpace(os.Getenv("CROWDSEC_CONFIG_FILE"))
+		}
 		if cfgFile == "" {
 			cfgFile = "/etc/crowdsec/config.yaml"
 		}
@@ -230,7 +233,10 @@ func (c *Client) copyToLocalFile(dstPath string, content io.Reader) error {
 }
 
 func (c *Client) pingCloudNative() error {
-	lapiURL := strings.TrimSpace(os.Getenv("CROWDSEC_LAPI_URL"))
+	lapiURL := strings.TrimSpace(c.lapiURL)
+	if lapiURL == "" {
+		lapiURL = strings.TrimSpace(os.Getenv("CROWDSEC_LAPI_URL"))
+	}
 	if lapiURL == "" {
 		return nil
 	}

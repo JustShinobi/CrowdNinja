@@ -12,7 +12,7 @@ import (
 )
 
 // defaultLogger is the global zap logger instance used throughout the application
-var defaultLogger *zap.Logger
+var defaultLogger *zap.Logger = zap.NewNop()
 
 // Init initializes the global logger with specified level and optional file output
 // Creates log directories if they don't exist and sets up multi-writer for stdout and file

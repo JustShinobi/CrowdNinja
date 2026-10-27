@@ -49,8 +49,15 @@ export default function Header({ onMenuClick, isCollapsed, onToggleCollapse }: H
     staleTime: 30000,
   })
 
+  const { data: authData } = useQuery({
+    queryKey: ['auth-status'],
+    queryFn: () => hostsAPI.authStatus(),
+    staleTime: 30000,
+  })
+
   const hosts: HostInfo[] = hostsData?.data?.data ?? []
-  const showHostSelector = hosts.length > 1
+  const showHostSelector = hosts.length >= 1
+  const authStatus = authData?.data?.data
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark")
@@ -198,8 +205,32 @@ export default function Header({ onMenuClick, isCollapsed, onToggleCollapse }: H
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>CrowdSec</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              {authStatus?.authenticated && authStatus?.user
+                ? `${authStatus.user.name} (${authStatus.user.provider.toUpperCase()})`
+                : 'CrowdNinja Security'}
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {authStatus?.enabled && !authStatus?.authenticated && (
+              <DropdownMenuItem asChild>
+                <a href={authStatus.login_url || '/api/auth/login'} className="cursor-pointer">
+                  <User className="h-4 w-4" />
+                  <span>Sign In (OIDC / SSO)</span>
+                </a>
+              </DropdownMenuItem>
+            )}
+            {authStatus?.authenticated && (
+              <DropdownMenuItem
+                onSelect={async () => {
+                  await hostsAPI.logout()
+                  window.location.reload()
+                }}
+                className="cursor-pointer"
+              >
+                <User className="h-4 w-4" />
+                <span>Sign Out ({authStatus.user?.username})</span>
+              </DropdownMenuItem>
+            )}
             <EnrollDialog
               trigger={
                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">

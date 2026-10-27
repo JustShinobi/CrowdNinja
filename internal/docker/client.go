@@ -24,9 +24,11 @@ import (
 // Client wraps the Docker SDK client (or Cloud-Native LAPI/Kubernetes runtime driver)
 // with convenience methods for container and CrowdSec management.
 type Client struct {
-	cli  *client.Client
-	ctx  context.Context
-	mode string // "docker", "lapi", or "kubernetes"
+	cli        *client.Client
+	ctx        context.Context
+	mode       string // "docker", "lapi", or "kubernetes"
+	lapiURL    string // optional per-instance LAPI URL
+	configFile string // optional per-instance CrowdSec config.yaml path
 }
 
 // NewClient creates a new runtime client with automatic mode detection
@@ -58,9 +60,11 @@ func NewClient() (*Client, error) {
 // when the HTTP request is cancelled.
 func (c *Client) WithContext(ctx context.Context) *Client {
 	return &Client{
-		cli:  c.cli,
-		ctx:  ctx,
-		mode: c.mode,
+		cli:        c.cli,
+		ctx:        ctx,
+		mode:       c.mode,
+		lapiURL:    c.lapiURL,
+		configFile: c.configFile,
 	}
 }
 

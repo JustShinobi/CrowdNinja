@@ -143,6 +143,15 @@ services:
 | `LOGS_PROVIDER` | `file` | `file`, `victorialogs`, or `loki` |
 | `VICTORIALOGS_URL` | *(empty)* | Base URL for VictoriaLogs (`http://victorialogs:3100`) |
 | `LOKI_URL` | *(empty)* | Base URL for Grafana Loki (`http://loki:3100`) |
+| `LAPI_INSTANCES` | *(empty)* | Comma-separated Multi-LAPI instances (`id=http://host:8080[|/path/config.yaml],...`) |
+| `AUTH_ENABLED` | `false` | Enable authentication middleware (`true` / `false`) |
+| `AUTH_MODE` | `auto` | `oidc` (OAuth2/OIDC + PKCE) or `trusted-header` (Authelia/Authentik ForwardAuth) |
+| `OIDC_ISSUER_URL` | *(empty)* | OIDC Discovery Issuer URL (`https://auth.example.com`) |
+| `OIDC_CLIENT_ID` | *(empty)* | OIDC Client ID |
+| `OIDC_CLIENT_SECRET` | *(empty)* | OIDC Client Secret |
+| `OIDC_REDIRECT_URL` | *(auto)* | OIDC Callback URL (`https://crowdninja.example.com/api/auth/callback`) |
+| `OIDC_ALLOWED_GROUPS` | *(empty)* | Optional comma-separated list of authorized OIDC/SSO groups (`admins,secops`) |
+| `AUTH_TRUSTED_HEADER_ENABLED` | `false` | Accept identity from trusted reverse-proxy headers (`Remote-User`, `Remote-Groups`) |
 | `GEOIP_DB_PATH` | `/app/geoip/GeoLite2-City.mmdb` | Optional MaxMind GeoLite2 City database path |
 
 ---
@@ -160,7 +169,16 @@ services:
 
 ### Structured Search & PromQL Metrics (`/api/crowdsec`)
 * `GET /api/crowdsec/decisions/analysis?q=ip:198.51.100.0/24+AND+-origin:CAPI` — Filter decisions using boolean structured queries.
-* `GET /api/crowdsec/promql?query=...` — Query runtime CrowdSec metrics from Prometheus or VictoriaMetrics.
+* `GET /api/crowdsec/alerts/analysis?q=country:CN+OR+asn:AS4134` — Filter alerts using boolean structured queries.
+* `GET /api/crowdsec/promql?query=...` — Query runtime CrowdSec metrics (`cs_*`) from Prometheus or VictoriaMetrics.
+
+### Multi-LAPI Instances & OIDC / SSO Authentication (`/api/hosts` & `/api/auth`)
+* `GET /api/hosts/list` — List all configured LAPI instances / hosts and their real-time connectivity status.
+* `POST /api/hosts/lapi` — Dynamically register or update a CrowdSec LAPI instance (`{ "id": "edge-dmz", "lapi_url": "http://10.20.10.10:8080", "config_file": "/etc/crowdsec/edge.yaml" }`).
+* `DELETE /api/hosts/lapi/:id` — Remove a dynamically registered LAPI instance.
+* `GET /api/auth/status` — Retrieve current authentication state and OIDC/SSO user profile (`sub`, `username`, `name`, `email`, `groups`, `provider`).
+* `GET /api/auth/login` & `GET /api/auth/callback` — OIDC Authorization Code Flow with PKCE S256.
+* `POST /api/auth/logout` — Clear session cookie.
 
 ---
 

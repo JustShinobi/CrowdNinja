@@ -5,6 +5,13 @@ mkdir -p /app/backups /app/logs /app/config /app/data /app/geoip \
          /var/lib/crowdsec/data /etc/crowdsec/hub /etc/crowdsec/parsers/s02-enrich \
          /etc/crowdsec/scenarios /etc/crowdsec/postoverflows /etc/crowdsec/notifications
 
+# Seed default CrowdSec templates from /staging/etc/crowdsec when present in the base image
+if [ -d /staging/etc/crowdsec ]; then
+  cp -rn /staging/etc/crowdsec/* /etc/crowdsec/ 2>/dev/null || true
+fi
+
+touch /var/lib/crowdsec/data/online_api_credentials.yaml
+
 # Bootstrap Cloud-Native CrowdSec configuration when database/LAPI environment variables are provided
 DB_HOST_VAL="${CROWDSEC_DB_HOST:-${DB_HOST:-}}"
 DB_PORT_VAL="${CROWDSEC_DB_PORT:-${DB_PORT:-5432}}"
@@ -64,6 +71,10 @@ fi
 if command -v cscli >/dev/null 2>&1 && [ ! -s /etc/crowdsec/hub/.index.json ]; then
   echo "[CrowdNinja] Initializing CrowdSec Hub index..."
   cscli hub update >/dev/null 2>&1 || true
+  if [ -n "${COLLECTIONS:-}" ]; then
+    # shellcheck disable=SC2086
+    cscli collections install $COLLECTIONS >/dev/null 2>&1 || true
+  fi
 fi
 
 exec "$@"

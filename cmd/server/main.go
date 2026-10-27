@@ -159,7 +159,12 @@ func main() {
 	// Add rate limiting middleware (100 requests per minute per IP)
 	apiGroup.Use(middleware.RateLimiter(100))
 
-	// Add Docker host selector middleware for multi-host support
+	// Load OIDC / Trusted-Header SSO authentication config & register /api/auth/* routes
+	authCfg := middleware.LoadAuthConfig()
+	apiGroup.Use(middleware.AuthMiddleware(authCfg))
+	middleware.RegisterAuthRoutes(apiGroup, authCfg)
+
+	// Add Docker host / Multi-LAPI instance selector middleware
 	apiGroup.Use(middleware.DockerHostSelector(multiHost))
 	diagnostics.RegisterRoutes(apiGroup, cfg)
 

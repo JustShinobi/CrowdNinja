@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
@@ -35,6 +36,15 @@ func NewMultiHostClient(hostsConfig string) (*MultiHostClient, error) {
 	}
 
 	if hostsConfig == "" {
+		// Check if LAPI_INSTANCES is set for Multi-LAPI Cloud-Native mode
+		if lapiInstances := strings.TrimSpace(os.Getenv("LAPI_INSTANCES")); lapiInstances != "" {
+			if err := mhc.registerLAPIInstancesString(lapiInstances); err != nil {
+				return nil, err
+			}
+			logger.Info("Multi-LAPI client initialized", "instances", len(mhc.clients), "default", mhc.defaultID)
+			return mhc, nil
+		}
+
 		// Fallback: single host from environment (DOCKER_HOST, default socket, or Cloud-Native LAPI/Kubernetes mode)
 		c, err := NewClient()
 		if err != nil {
@@ -42,7 +52,12 @@ func NewMultiHostClient(hostsConfig string) (*MultiHostClient, error) {
 		}
 		endpoint := "unix:///var/run/docker.sock"
 		if c.isCloudNative() {
-			endpoint = "cloudnative://" + c.mode
+			endpoint = strings.TrimSpace(os.Getenv("CROWDSEC_LAPI_URL"))
+			if endpoint == "" {
+				endpoint = "cloudnative://" + c.mode
+			}
+			c.lapiURL = os.Getenv("CROWDSEC_LAPI_URL")
+			c.configFile = os.Getenv("CROWDSEC_CONFIG_FILE")
 		}
 		mhc.clients["local"] = c
 		mhc.defaultID = "local"
@@ -66,6 +81,23 @@ func NewMultiHostClient(hostsConfig string) (*MultiHostClient, error) {
 
 		hostID := strings.TrimSpace(parts[0])
 		endpoint := strings.TrimSpace(parts[1])
+
+		if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
+			lapiURL, cfgPath := splitLAPIEndpoint(endpoint)
+			mhc.clients[hostID] = &Client{
+				cli:        nil,
+				ctx:        context.Background(),
+				mode:       "lapi",
+				lapiURL:    lapiURL,
+				configFile: cfgPath,
+			}
+			mhc.hosts = append(mhc.hosts, HostInfo{ID: hostID, Endpoint: lapiURL, IsLocal: false})
+			if i == 0 {
+				mhc.defaultID = hostID
+			}
+			logger.Info("Registered Cloud-Native LAPI instance", "id", hostID, "lapi_url", lapiURL)
+			continue
+		}
 
 		isLocal := strings.HasPrefix(endpoint, "unix://")
 
@@ -146,4 +178,102 @@ func (m *MultiHostClient) Close() {
 			logger.Error("Failed to close Docker client", "host", id, "error", err)
 		}
 	}
+}
+
+func splitLAPIEndpoint(raw string) (string, string) {
+	parts := strings.SplitN(raw, "|", 2)
+	lapiURL := strings.TrimSpace(parts[0])
+	var cfgPath string
+	if len(parts) == 2 {
+		cfgPath = strings.TrimSpace(parts[1])
+	}
+	return lapiURL, cfgPath
+}
+
+func (m *MultiHostClient) registerLAPIInstancesString(raw string) error {
+	entries := strings.Split(raw, ",")
+	for i, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		var hostID, endpoint string
+		if eqIdx := strings.Index(entry, "="); eqIdx > 0 {
+			hostID = strings.TrimSpace(entry[:eqIdx])
+			endpoint = strings.TrimSpace(entry[eqIdx+1:])
+		} else if colIdx := strings.Index(entry, ":"); colIdx > 0 {
+			hostID = strings.TrimSpace(entry[:colIdx])
+			endpoint = strings.TrimSpace(entry[colIdx+1:])
+		} else {
+			return fmt.Errorf("invalid LAPI_INSTANCES entry %q: expected id=http://host:8080[|/path/config.yaml]", entry)
+		}
+		lapiURL, cfgPath := splitLAPIEndpoint(endpoint)
+		if hostID == "" || lapiURL == "" {
+			return fmt.Errorf("invalid LAPI_INSTANCES entry %q", entry)
+		}
+		m.RegisterLAPIInstance(hostID, lapiURL, cfgPath)
+		if i == 0 {
+			m.defaultID = hostID
+		}
+	}
+	if len(m.clients) == 0 {
+		return fmt.Errorf("no valid LAPI instances configured in LAPI_INSTANCES")
+	}
+	return nil
+}
+
+// RegisterLAPIInstance dynamically adds or updates a Cloud-Native CrowdSec LAPI instance at runtime.
+func (m *MultiHostClient) RegisterLAPIInstance(id, lapiURL, configFile string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	id = strings.TrimSpace(id)
+	lapiURL = strings.TrimSpace(lapiURL)
+	configFile = strings.TrimSpace(configFile)
+
+	m.clients[id] = &Client{
+		cli:        nil,
+		ctx:        context.Background(),
+		mode:       "lapi",
+		lapiURL:    lapiURL,
+		configFile: configFile,
+	}
+
+	found := false
+	for i := range m.hosts {
+		if m.hosts[i].ID == id {
+			m.hosts[i].Endpoint = lapiURL
+			found = true
+			break
+		}
+	}
+	if !found {
+		m.hosts = append(m.hosts, HostInfo{ID: id, Endpoint: lapiURL, IsLocal: id == m.defaultID})
+	}
+	if m.defaultID == "" {
+		m.defaultID = id
+	}
+}
+
+// RemoveLAPIInstance removes a dynamically registered LAPI instance (cannot remove default instance).
+func (m *MultiHostClient) RemoveLAPIInstance(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	id = strings.TrimSpace(id)
+	if id == m.defaultID {
+		return fmt.Errorf("cannot remove default instance %q", id)
+	}
+	if _, ok := m.clients[id]; !ok {
+		return fmt.Errorf("instance %q not found", id)
+	}
+	delete(m.clients, id)
+	filtered := make([]HostInfo, 0, len(m.hosts))
+	for _, h := range m.hosts {
+		if h.ID != id {
+			filtered = append(filtered, h)
+		}
+	}
+	m.hosts = filtered
+	return nil
 }

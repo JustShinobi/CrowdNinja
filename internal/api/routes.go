@@ -229,11 +229,13 @@ func RegisterProfileRoutes(router *gin.RouterGroup, db *database.Database, cfg *
 	}
 }
 
-// RegisterHostRoutes configures endpoints for listing and managing Docker hosts
+// RegisterHostRoutes configures endpoints for listing and managing Docker hosts and LAPI instances
 func RegisterHostRoutes(router *gin.RouterGroup, multiHost *docker.MultiHostClient) {
 	hosts := router.Group("/hosts")
 	{
 		hosts.GET("/list", handlers.ListDockerHosts(multiHost))
+		hosts.POST("/lapi", handlers.RegisterLAPIInstanceHandler(multiHost))
+		hosts.DELETE("/lapi/:id", handlers.RemoveLAPIInstanceHandler(multiHost))
 	}
 }
 
