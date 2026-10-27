@@ -36,9 +36,9 @@ RUN apk --no-cache add ca-certificates tzdata curl
 
 WORKDIR /app
 
-# Copy embedded cscli and default /etc/crowdsec templates for Cloud-Native mode
+# Copy embedded cscli and default /staging/etc/crowdsec templates for Cloud-Native mode
 COPY --from=crowdsec-cli /usr/local/bin/cscli /usr/local/bin/cscli
-COPY --from=crowdsec-cli /etc/crowdsec /etc/crowdsec
+COPY --from=crowdsec-cli /staging/etc/crowdsec /etc/crowdsec
 
 # Copy CrowdNinja backend binary, entrypoint, and frontend assets
 COPY --from=backend-builder /app/crowdsec-manager .
